@@ -111,7 +111,14 @@ actual fun SquatCameraScreen(onBack: () -> Unit) {
                 "Green skeleton: Your pose is detected reliably while standing.",
                 "Yellow skeleton: The app is waiting for your starting position or tracking an active squat.",
                 "Red skeleton: Your pose is unreliable. Adjust your position so your legs and joints are visible.",
-                "Use the Show/Hide Skeleton button to turn the visual overlay on or off. Squat counting continues when the overlay is hidden."
+                "Use the Show/Hide Skeleton button to turn the visual overlay on or off. Squat counting continues when the overlay is hidden.",
+
+                // Liveness verification guidance
+                "Complete liveness verification before squat repetitions can be counted.",
+                "Follow the on-screen verification instruction and keep your body visible in the camera frame.",
+                "If verification pauses or fails, raise your right hand above your right shoulder and hold it for about 1.5 seconds to restart verification.",
+                "Alternatively, tap Revalidate when the button is displayed.",
+                "Squat counting resumes only after verification succeeds and counting is enabled."
             ), onContinue = { dontShowAgain ->
                 rulesPreferences.setDontShowAgain(
                     exerciseId = "squat", dontShowAgain = dontShowAgain
@@ -163,7 +170,21 @@ private fun SquatCameraContent(onBack: () -> Unit) {
     var verificationSuccessToastKey by remember {
         mutableIntStateOf(0)
     }
+    var rightHandRaisedSinceMs by remember {
+        mutableStateOf<Long?>(null)
+    }
 
+    var rightHandLastSeenMs by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    var rightHandRaisedFrames by remember {
+        mutableIntStateOf(0)
+    }
+
+    var lastGestureRevalidationMs by remember {
+        mutableStateOf(0L)
+    }
     // Used to restart the success-message timer on every reset.
     var resetToastKey by remember {
         mutableIntStateOf(0)
@@ -209,7 +230,7 @@ private fun SquatCameraContent(onBack: () -> Unit) {
         mutableStateOf(false)
     }
     var isSkeletonVisible by remember {
-        mutableStateOf(false)
+        mutableStateOf(true)
     }
     var showSquatHelp by remember {
         mutableStateOf(false)
@@ -390,6 +411,67 @@ private fun SquatCameraContent(onBack: () -> Unit) {
                 onLandmarksDetected = { landmarks ->
                     mainHandler.post {
                         poseLandmarks = landmarks.orEmpty()
+
+                        val currentLandmarks = landmarks.orEmpty()
+                        val nowMs = SystemClock.uptimeMillis()
+
+                        val canRetryNow =
+                            livenessState.status == LivenessStatus.PAUSED || livenessState.status == LivenessStatus.FAILED
+
+                        if (canRetryNow) {
+                            val rightShoulder = currentLandmarks.getOrNull(12)
+                            val rightWrist = currentLandmarks.getOrNull(16)
+
+                            val landmarksReliable =
+                                rightShoulder != null && rightWrist != null && rightShoulder.visibility >= 0.45f && rightWrist.visibility >= 0.45f
+
+                            val isRightHandRaised =
+                                landmarksReliable && rightWrist.y < rightShoulder.y - 0.05f
+
+                            if (isRightHandRaised) {
+                                rightHandLastSeenMs = nowMs
+                                rightHandRaisedFrames++
+
+                                if (rightHandRaisedSinceMs == null) {
+                                    rightHandRaisedSinceMs = nowMs
+                                    rightHandRaisedFrames = 1
+                                }
+
+                                val heldDurationMs = nowMs - (rightHandRaisedSinceMs ?: nowMs)
+
+                                val enoughFrames = rightHandRaisedFrames >= 15
+                                val enoughTime = heldDurationMs >= 2000L
+                                val cooldownFinished = nowMs - lastGestureRevalidationMs >= 2000L
+
+                                if (enoughFrames && enoughTime && cooldownFinished) {
+                                    lastGestureRevalidationMs = nowMs
+
+                                    rightHandRaisedSinceMs = null
+                                    rightHandLastSeenMs = null
+                                    rightHandRaisedFrames = 0
+
+                                    livenessEvaluator.restart(nowMs)
+                                    livenessState = livenessEvaluator.state
+
+                                    // Do not reset squatDetector: preserve the rep count.
+                                    poseStatus = livenessState.instruction
+                                    warningMessage = null
+                                }
+                            } else {
+                                val lastSeen = rightHandLastSeenMs
+
+                                // Tolerate brief landmark drops for up to 400 ms.
+                                if (lastSeen == null || nowMs - lastSeen > 400L) {
+                                    rightHandRaisedSinceMs = null
+                                    rightHandLastSeenMs = null
+                                    rightHandRaisedFrames = 0
+                                }
+                            }
+                        } else {
+                            rightHandRaisedSinceMs = null
+                            rightHandLastSeenMs = null
+                            rightHandRaisedFrames = 0
+                        }
                     }
                 },
             )
@@ -536,18 +618,27 @@ private fun SquatCameraContent(onBack: () -> Unit) {
 
                     Button(
                         onClick = {
-                            livenessEvaluator.restart(SystemClock.uptimeMillis())
+                            val nowMs = SystemClock.uptimeMillis()
+
+                            rightHandRaisedSinceMs = null
+                            rightHandLastSeenMs = null
+                            rightHandRaisedFrames = 0
+                            livenessEvaluator.restart(nowMs)
                             livenessState = livenessEvaluator.state
-                            squatState = squatDetector.reset().toSquatUiState()
                             poseStatus = livenessState.instruction
                             warningMessage = null
-                            isSkeletonVisible = true
                         }, shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF7CF5B4), contentColor = Color(0xFF101820)
                         )
                     ) {
                         Text("Revalidate", fontWeight = FontWeight.Bold)
                     }
+
+                    Text(
+                        text = "Raise and hold your both hands above your shoulder for 2-3 seconds to revalidate, or tap Revalidate.",
+                        color = Color(0xFFB8D8D0),
+                        fontSize = 15.sp
+                    )
                 }
             }
         }

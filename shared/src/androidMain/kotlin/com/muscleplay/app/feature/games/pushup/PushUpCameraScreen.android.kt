@@ -106,7 +106,8 @@ actual fun PushUpCameraScreen(onBack: () -> Unit) {
 
     if (showRulesDialog) {
         ExerciseRulesDialog(
-            title = "Push-up", rules = listOf(
+            title = "Push-up",
+            rules = listOf(
                 "Position the camera so your upper body and arms are visible.",
                 "Use a side-on position for more reliable elbow-angle detection.",
                 "Keep your shoulders, elbows and wrists visible throughout the exercise.",
@@ -116,13 +117,21 @@ actual fun PushUpCameraScreen(onBack: () -> Unit) {
                 "Green skeleton: your pose is detected reliably.",
                 "Yellow skeleton: tracking your movement or waiting for the starting position.",
                 "Red skeleton: your pose is unreliable. Adjust your position.",
-                "Use Show/Hide Skeleton to control the visual overlay. Counting continues when it is hidden."
-            ), onContinue = { dontShowAgain ->
+                "Use Show/Hide Skeleton to control the visual overlay. Counting continues when it is hidden.",
+                "Complete liveness verification before repetitions can be counted.",
+                "Follow the on-screen verification instruction and keep your upper body and arms visible.",
+                "If verification pauses or fails, raise your right hand above your right shoulder and hold it for about 1.5 seconds to restart verification.",
+                "Alternatively, tap Revalidate when the button is displayed.",
+                "Repetition counting resumes only after verification succeeds and counting is enabled."
+            ),
+            onContinue = { dontShowAgain ->
                 rulesPreferences.setDontShowAgain(
-                    exerciseId = "pushup", dontShowAgain = dontShowAgain
+                    exerciseId = "pushup",
+                    dontShowAgain = dontShowAgain
                 )
                 showRulesDialog = false
-            })
+            }
+        )
         return
     }
 
@@ -150,7 +159,28 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
     var resetMessage by remember { mutableStateOf(false) }
     var resetToastKey by remember { mutableIntStateOf(0) }
 
+    var verificationSuccessMessage by remember { mutableStateOf(false) }
+    var verificationSuccessToastKey by remember { mutableIntStateOf(0) }
+
+    // Right-hand gesture revalidation: 1.5-second hold with a brief dropout grace period.
+    var rightHandRaisedSinceMs by remember { mutableStateOf<Long?>(null) }
+    var rightHandLastSeenMs by remember { mutableStateOf<Long?>(null) }
+    var rightHandRaisedFrames by remember { mutableIntStateOf(0) }
+    var lastGestureRevalidationMs by remember { mutableStateOf(0L) }
+
     val detector = remember { PushUpExerciseDetector() }
+    val livenessEvaluator = remember {
+        LivenessChallengeEvaluator(
+            config = LivenessConfig(
+                minimumVisibility = 0.45f,
+                requiredStableFrames = 4,
+                minimumFrameIntervalMs = 30L,
+                challengeTimeoutMs = 15_000L,
+                maxAttempts = 3
+            )
+        )
+    }
+    var livenessState by remember { mutableStateOf(livenessEvaluator.state) }
 
     var exerciseState by remember {
         mutableStateOf(ExerciseState())
@@ -188,6 +218,18 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
     val previewView = remember {
         PreviewView(context).apply {
             scaleType = PreviewView.ScaleType.FILL_CENTER
+        }
+    }
+
+    LaunchedEffect(livenessEvaluator) {
+        livenessEvaluator.start(SystemClock.uptimeMillis())
+        livenessState = livenessEvaluator.state
+    }
+
+    LaunchedEffect(verificationSuccessToastKey) {
+        if (verificationSuccessMessage) {
+            delay(3000.milliseconds)
+            verificationSuccessMessage = false
         }
     }
 
@@ -255,20 +297,52 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                     mainHandler.post {
                         if (disposed) return@post
 
-                        val updatedState = if (pose == null) {
-                            detector.onPoseLost()
+                        val nowMs = SystemClock.uptimeMillis()
+                        if (pose == null) {
+                            livenessState = livenessEvaluator.onPoseLost()
+                            exerciseState = detector.onPoseLost()
+                            poseStatus = NO_PERSON_WARNING
+                        } else if (
+                            livenessState.status == LivenessStatus.VERIFIED &&
+                            livenessState.canCountRepetitions
+                        ) {
+                            val updatedState = detector.processPose(pose)
+                            exerciseState = updatedState
+                            poseStatus = when {
+                                !updatedState.isPoseReliable -> ARMS_WARNING
+                                updatedState.phase == ExercisePhase.ACTIVE ->
+                                    "Push-up detected — push back up to complete the rep"
+                                else -> updatedState.feedback
+                            }
                         } else {
-                            detector.processPose(pose)
-                        }
-
-                        exerciseState = updatedState
-
-                        poseStatus = when {
-                            pose == null -> NO_PERSON_WARNING
-                            !updatedState.isPoseReliable -> ARMS_WARNING
-                            updatedState.phase == ExercisePhase.ACTIVE -> "Push-up detected — push back up to complete the rep"
-
-                            else -> updatedState.feedback
+                            when (livenessState.status) {
+                                LivenessStatus.NOT_STARTED,
+                                LivenessStatus.CHALLENGE_REQUIRED,
+                                LivenessStatus.CHALLENGE_IN_PROGRESS -> {
+                                    val previousStatus = livenessState.status
+                                    livenessState = livenessEvaluator.process(
+                                        pose.toLivenessPose(), nowMs
+                                    )
+                                    val verificationJustSucceeded =
+                                        previousStatus != LivenessStatus.VERIFIED &&
+                                                livenessState.status == LivenessStatus.VERIFIED &&
+                                                livenessState.canCountRepetitions
+                                    if (verificationJustSucceeded) {
+                                        verificationSuccessMessage = true
+                                        verificationSuccessToastKey++
+                                    }
+                                    poseStatus = livenessState.instruction
+                                }
+                                LivenessStatus.PAUSED,
+                                LivenessStatus.FAILED -> {
+                                    poseStatus = livenessState.instruction
+                                }
+                                LivenessStatus.VERIFIED -> {
+                                    poseStatus = "Preparing verification..."
+                                }
+                            }
+                            // Preserve the detector's existing repetition count while verifying.
+                            exerciseState = detector.onPoseLost()
                         }
                     }
                 },
@@ -279,8 +353,64 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                 },
                 onLandmarksDetected = { landmarks ->
                     mainHandler.post {
-                        if (!disposed) {
-                            poseLandmarks = landmarks.orEmpty()
+                        if (disposed) return@post
+
+                        poseLandmarks = landmarks.orEmpty()
+                        val currentLandmarks = landmarks.orEmpty()
+                        val nowMs = SystemClock.uptimeMillis()
+                        val canRetryNow =
+                            livenessState.status == LivenessStatus.PAUSED ||
+                                    livenessState.status == LivenessStatus.FAILED
+
+                        if (canRetryNow) {
+                            val rightShoulder = currentLandmarks.getOrNull(12)
+                            val rightWrist = currentLandmarks.getOrNull(16)
+                            val landmarksReliable =
+                                rightShoulder != null && rightWrist != null &&
+                                        rightShoulder.visibility >= 0.45f &&
+                                        rightWrist.visibility >= 0.45f
+                            val isRightHandRaised =
+                                landmarksReliable &&
+                                        rightWrist.y < rightShoulder.y - 0.05f
+
+                            if (isRightHandRaised) {
+                                rightHandLastSeenMs = nowMs
+                                if (rightHandRaisedSinceMs == null) {
+                                    rightHandRaisedSinceMs = nowMs
+                                    rightHandRaisedFrames = 1
+                                } else {
+                                    rightHandRaisedFrames++
+                                }
+
+                                val heldDurationMs = nowMs - (rightHandRaisedSinceMs ?: nowMs)
+                                val enoughFrames = rightHandRaisedFrames >= 15
+                                val enoughTime = heldDurationMs >= 1500L
+                                val cooldownFinished =
+                                    nowMs - lastGestureRevalidationMs >= 2000L
+
+                                if (enoughFrames && enoughTime && cooldownFinished) {
+                                    lastGestureRevalidationMs = nowMs
+                                    rightHandRaisedSinceMs = null
+                                    rightHandLastSeenMs = null
+                                    rightHandRaisedFrames = 0
+                                    livenessEvaluator.restart(nowMs)
+                                    livenessState = livenessEvaluator.state
+                                    poseStatus = livenessState.instruction
+                                    warningMessage = null
+                                }
+                            } else {
+                                val lastSeen = rightHandLastSeenMs
+                                // Tolerate brief landmark dropouts for up to 400 ms.
+                                if (lastSeen == null || nowMs - lastSeen > 400L) {
+                                    rightHandRaisedSinceMs = null
+                                    rightHandLastSeenMs = null
+                                    rightHandRaisedFrames = 0
+                                }
+                            }
+                        } else {
+                            rightHandRaisedSinceMs = null
+                            rightHandLastSeenMs = null
+                            rightHandRaisedFrames = 0
                         }
                     }
                 })
@@ -310,7 +440,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                                 val bitmap = imageProxy.toRgbaBitmap()
                                 val mpImage = BitmapImageBuilder(bitmap).build()
 
-                                poseHelper?.detect(
+                                poseHelper.detect(
                                     mpImage, SystemClock.uptimeMillis()
                                 )
                             } catch (exception: Exception) {
@@ -352,7 +482,15 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
             factory = { previewView }, modifier = Modifier.fillMaxSize()
         )
 
-        if (isSkeletonVisible) {
+        val isVerified =
+            livenessState.status == LivenessStatus.VERIFIED &&
+                    livenessState.canCountRepetitions
+        val canRetry =
+            livenessState.status == LivenessStatus.PAUSED ||
+                    livenessState.status == LivenessStatus.FAILED
+        val shouldShowSkeleton = !isVerified || isSkeletonVisible
+
+        if (shouldShowSkeleton) {
             PoseSkeletonOverlay(
                 landmarks = poseLandmarks,
                 modifier = Modifier.matchParentSize(),
@@ -361,6 +499,87 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                 minimumVisibility = 0.5f,
                 skeletonColor = skeletonColor
             )
+        }
+
+        // Liveness verification overlay belongs in the Compose Box, not inside LaunchedEffect.
+        if (!isVerified) {
+            Column(
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp)
+                    .fillMaxWidth()
+                    .background(Color(0xCC101820), RoundedCornerShape(16.dp))
+                    .border(1.dp, Color(0x557CF5B4), RoundedCornerShape(16.dp))
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (!canRetry) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(38.dp), color = PushUpGreen, strokeWidth = 3.dp
+                    )
+                    Text(
+                        text = if (livenessState.status == LivenessStatus.CHALLENGE_IN_PROGRESS)
+                            "Verifying your movement..." else "Preparing verification...",
+                        color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = livenessState.instruction,
+                        color = Color(0xFFE0E7EB), fontSize = 16.sp
+                    )
+                    livenessState.reason?.let { reason ->
+                        Text(text = reason, color = Color(0xFFFFD180), fontSize = 12.sp)
+                    }
+                } else {
+                    Text(
+                        text = if (livenessState.status == LivenessStatus.FAILED)
+                            "Verification failed" else "Verification paused",
+                        color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = livenessState.reason ?: livenessState.instruction,
+                        color = Color(0xFFE0E7EB), fontSize = 14.sp
+                    )
+                    Button(
+                        onClick = {
+                            val nowMs = SystemClock.uptimeMillis()
+                            rightHandRaisedSinceMs = null
+                            rightHandLastSeenMs = null
+                            rightHandRaisedFrames = 0
+                            livenessEvaluator.restart(nowMs)
+                            livenessState = livenessEvaluator.state
+                            poseStatus = livenessState.instruction
+                            warningMessage = null
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PushUpGreen, contentColor = PushUpDark
+                        )
+                    ) { Text("Revalidate", fontWeight = FontWeight.Bold) }
+                    Text(
+                        text = "Raise and hold your right hand above your shoulder for 1.5 seconds to revalidate, or tap Revalidate.",
+                        color = PushUpMuted, fontSize = 13.sp
+                    )
+                }
+            }
+        }
+
+        if (verificationSuccessMessage) {
+            Row(
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp)
+                    .background(Color(0xEE163D2D), RoundedCornerShape(12.dp))
+                    .border(1.dp, PushUpGreen, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("✓", color = PushUpGreen, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        "Verification Successful!", color = Color.White,
+                        fontSize = 15.sp, fontWeight = FontWeight.Bold
+                    )
+                    Text("Start exercising!", color = PushUpMuted, fontSize = 13.sp)
+                }
+            }
         }
 
         if (resetMessage) {
@@ -449,7 +668,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
         }
 
         // Bottom options panel, styled like the squat screen.
-        if (isHudVisible) {
+        if (isVerified && isHudVisible) {
             Column(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 12.dp).background(
@@ -560,7 +779,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                     Text("Reset")
                 }
             }
-        } else {
+        } else if (isVerified) {
             Button(
                 onClick = { isHudVisible = true },
                 modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
