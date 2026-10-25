@@ -47,6 +47,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -83,6 +85,10 @@ private const val RETRY_HOLD_MS = 1_500L
 private const val RETRY_COOLDOWN_MS = 2_000L
 private const val LANDMARK_DROPOUT_GRACE_MS = 400L
 
+private val OrangePrimary = Color(0xFFFF5722)
+private val OrangeSecondary = Color(0xFFFF9800)
+private val DarkBackground = Color(0xFF0F0F17)
+
 data class ExerciseCameraConfig(
     val type: ExerciseType,
     val title: String,
@@ -94,13 +100,13 @@ data class ExerciseCameraConfig(
     val helpContent: ExerciseHelpContent,
     val rules: List<String>,
     val successPopupDurationMs: Long = 3_000L,
-    val accentColor: Color = Color(0xFF7CF5B4),
-    val darkColor: Color = Color(0xFF101820),
-    val mutedColor: Color = Color(0xFFB8D8D0),
-    val panelColor: Color = Color(0xFF24313B),
-    val buttonColor: Color = Color(0xFF34434E),
-    val warningColor: Color = Color(0xFFFFC107),
-    val errorColor: Color = Color(0xFFFF5252),
+    val accentColor: Color = Color(0xFF7CF5B4), // Green (Reliable pose)
+    val darkColor: Color = DarkBackground,
+    val mutedColor: Color = Color(0xFFB8D8D0), // Soft Mint
+    val panelColor: Color = Color(0xEE1A1A26),
+    val buttonColor: Color = OrangePrimary,
+    val warningColor: Color = Color(0xFFFFC107), // Yellow (Tracking/Waiting pose)
+    val errorColor: Color = Color(0xFFFF5252), // Red (Unreliable pose)
 )
 
 object ExerciseCameraConfigs {
@@ -244,11 +250,11 @@ private fun ExerciseCameraContent(
     var isSkeletonVisible by remember { mutableStateOf(config.initialSkeletonVisible) }
     var showExerciseHelp by remember { mutableStateOf(false) }
 
+    // Green (Reliable), Yellow (Tracking/Waiting), Red (Unreliable) Overlay Color Logic
     val skeletonColor = when {
-        !exerciseState.isPoseReliable -> config.errorColor
-        exerciseState.phase == ExercisePhase.WAITING_FOR_START || exerciseState.phase == ExercisePhase.ACTIVE -> config.warningColor
-
-        else -> config.accentColor
+        !exerciseState.isPoseReliable -> config.errorColor // Red (0xFFFF5252)
+        exerciseState.phase == ExercisePhase.WAITING_FOR_START || exerciseState.phase == ExercisePhase.ACTIVE -> config.warningColor // Yellow (0xFFFFC107)
+        else -> config.accentColor // Green (0xFF7CF5B4)
     }
 
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
@@ -305,14 +311,24 @@ private fun ExerciseCameraContent(
         ) {
             Text(
                 cameraError
-                    ?: "MusclePlay needs camera access to detect your ${config.title.lowercase()} exercise."
+                    ?: "MusclePlay needs camera access to detect your ${config.title.lowercase()} exercise.",
+                color = Color.White
             )
+            Spacer(modifier = Modifier.size(16.dp))
             Button(
                 onClick = {
                     cameraError = null
                     permissionLauncher.launch(Manifest.permission.CAMERA)
-                }) { Text("Grant camera permission") }
-            Button(onClick = onBack) { Text("Back") }
+                },
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+            ) { Text("Grant camera permission", fontWeight = FontWeight.Bold) }
+            Spacer(modifier = Modifier.size(8.dp))
+            Button(
+                onClick = onBack,
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.15f))
+            ) { Text("Back", fontWeight = FontWeight.Bold) }
         }
         return
     }
@@ -364,7 +380,6 @@ private fun ExerciseCameraContent(
 
                                 LivenessStatus.VERIFIED -> poseStatus = "Preparing verification..."
                             }
-                            // Keep the detector's existing rep count; don't process verification frames.
                             exerciseState = detector.onPoseLost()
                         }
                     }
@@ -486,6 +501,7 @@ private fun ExerciseCameraContent(
             livenessState.status == LivenessStatus.PAUSED || livenessState.status == LivenessStatus.FAILED
         val shouldShowSkeleton = !isVerified || isSkeletonVisible
 
+        // Pose Skeleton Overlay using Green (Reliable), Yellow (Tracking/Waiting), Red (Unreliable)
         if (shouldShowSkeleton) {
             PoseSkeletonOverlay(
                 landmarks = poseLandmarks,
@@ -497,40 +513,67 @@ private fun ExerciseCameraContent(
             )
         }
 
+        // Verification Glass Overlay Card
         if (!isVerified) {
             Column(
-                modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp)
-                    .fillMaxWidth().background(Color(0xCC101820), RoundedCornerShape(16.dp))
-                    .border(1.dp, Color(0x557CF5B4), RoundedCornerShape(16.dp)).padding(20.dp),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 24.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xEE1A1A26),
+                                Color(0xEE12121B)
+                            )
+                        )
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.35f),
+                                OrangePrimary.copy(alpha = 0.3f),
+                                Color.White.copy(alpha = 0.08f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                    .padding(22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 if (!canRetry) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(38.dp),
-                        color = config.accentColor,
-                        strokeWidth = 3.dp
+                        modifier = Modifier.size(42.dp),
+                        color = config.accentColor, // Green progress ring
+                        strokeWidth = 3.5.dp
                     )
                     Text(
                         text = if (livenessState.status == LivenessStatus.CHALLENGE_IN_PROGRESS) "Verifying your movement..." else "Preparing verification...",
                         color = Color.White,
                         fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Bold
                     )
-                    Text(livenessState.instruction, color = Color(0xFFE0E7EB), fontSize = 16.sp)
+                    Text(
+                        text = livenessState.instruction,
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 15.sp
+                    )
                     livenessState.reason?.let {
-                        Text(it, color = Color(0xFFFFD180), fontSize = 12.sp)
+                        Text(it, color = config.warningColor, fontSize = 13.sp) // Yellow reason
                     }
                 } else {
                     Text(
                         text = if (livenessState.status == LivenessStatus.FAILED) "Verification failed" else "Verification paused",
                         color = Color.White,
                         fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
-                        livenessState.reason ?: livenessState.instruction,
-                        color = Color(0xFFE0E7EB),
+                        text = livenessState.reason ?: livenessState.instruction,
+                        color = Color.White.copy(alpha = 0.8f),
                         fontSize = 14.sp
                     )
                     Button(
@@ -543,31 +586,66 @@ private fun ExerciseCameraContent(
                             livenessState = livenessEvaluator.state
                             poseStatus = livenessState.instruction
                             warningMessage = null
-                        }, shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(
-                            containerColor = config.accentColor, contentColor = config.darkColor
+                        },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = config.accentColor, // Green Revalidate
+                            contentColor = Color(0xFF101820)
                         )
-                    ) { Text("Revalidate", fontWeight = FontWeight.Bold) }
+                    ) {
+                        Text("Revalidate", fontWeight = FontWeight.Bold)
+                    }
                     Text(
-                        "Raise and hold your both hands above your shoulder for 2-3 seconds to revalidate, or tap Revalidate.",
-                        color = config.mutedColor,
-                        fontSize = 15.sp
+                        text = "Raise and hold your right hand above your shoulder for 2-3 seconds to revalidate, or tap Revalidate.",
+                        color = config.warningColor, // Yellow hint
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
         }
 
+        // Verification Success Toast
         if (verificationSuccessMessage) {
             Row(
-                modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp)
-                    .background(Color(0xEE163D2D), RoundedCornerShape(12.dp))
-                    .border(1.dp, config.accentColor, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 18.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 24.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xEE1A1A26),
+                                Color(0xEE12121B)
+                            )
+                        )
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.35f),
+                                config.accentColor.copy(alpha = 0.5f),
+                                Color.White.copy(alpha = 0.08f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    "✓", color = config.accentColor, fontSize = 22.sp, fontWeight = FontWeight.Bold
-                )
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(config.accentColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "✓", color = Color(0xFF101820), fontSize = 20.sp, fontWeight = FontWeight.Bold
+                    )
+                }
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         "Verification Successful!",
@@ -580,64 +658,136 @@ private fun ExerciseCameraContent(
             }
         }
 
+        // Reset Toast
         if (resetMessage) {
             Row(
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 100.dp)
-                    .background(Color(0xEE163D2D), RoundedCornerShape(12.dp))
-                    .border(1.dp, config.accentColor, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 100.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xEE1A1A26),
+                                Color(0xEE12121B)
+                            )
+                        )
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.35f),
+                                config.accentColor.copy(alpha = 0.5f),
+                                Color.White.copy(alpha = 0.08f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    "✓", color = config.accentColor, fontSize = 18.sp, fontWeight = FontWeight.Bold
-                )
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(config.accentColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "✓", color = Color(0xFF101820), fontSize = 16.sp, fontWeight = FontWeight.Bold
+                    )
+                }
                 Text(
                     "Reps reset successfully!",
                     color = Color.White,
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
 
+        // Warning Toast
         warningMessage?.let { message ->
             Row(
-                modifier = Modifier.align(Alignment.TopStart)
-                    .padding(top = 8.dp, start = 8.dp, end = 100.dp)
-                    .background(Color(0xEE332719), RoundedCornerShape(12.dp))
-                    .border(1.dp, Color(0xFFFFB74D), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = 16.dp, start = 16.dp, end = 120.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xEE1A1A26),
+                                Color(0xEE12121B)
+                            )
+                        )
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.35f),
+                                config.warningColor.copy(alpha = 0.5f),
+                                Color.White.copy(alpha = 0.08f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("⚠", color = Color(0xFFFFB74D), fontSize = 18.sp)
+                Text("⚠", color = config.warningColor, fontSize = 18.sp)
                 Text(message, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
             }
         }
 
+        // Reps Counter Badge (Top Right)
         Column(
-            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
-                .background(config.darkColor, RoundedCornerShape(18.dp))
-                .padding(horizontal = 24.dp, vertical = 12.dp),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+                .clip(RoundedCornerShape(22.dp))
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xEE1A1A26),
+                            Color(0xEE12121B)
+                        )
+                    )
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.35f),
+                            OrangePrimary.copy(alpha = 0.3f),
+                            Color.White.copy(alpha = 0.08f)
+                        )
+                    ),
+                    shape = RoundedCornerShape(22.dp)
+                )
+                .padding(horizontal = 22.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("REPS", style = MaterialTheme.typography.labelSmall, color = config.mutedColor)
+            Text("REPS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = OrangeSecondary)
             Text(
                 exerciseState.repetitions.toString(),
-                style = MaterialTheme.typography.headlineMedium,
-                color = config.accentColor
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
             )
             Spacer(modifier = Modifier.padding(top = 4.dp))
             Button(
                 onClick = { showExerciseHelp = true },
-                modifier = Modifier.size(35.dp),
+                modifier = Modifier.size(36.dp),
                 shape = CircleShape,
                 contentPadding = PaddingValues(0.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = config.buttonColor, contentColor = Color.White
+                    containerColor = OrangePrimary, contentColor = Color.White
                 )
-            ) { Text("?", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+            ) { Text("?", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
         }
 
         if (showExerciseHelp) {
@@ -645,16 +795,40 @@ private fun ExerciseCameraContent(
                 content = config.helpContent, onDismiss = { showExerciseHelp = false })
         }
 
+        // HUD / Options Glass Panel (Bottom Center)
         if (isVerified && isHudVisible) {
             Column(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 12.dp)
-                    .background(config.darkColor, RoundedCornerShape(18.dp)).padding(12.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xEE1A1A26),
+                                Color(0xEE12121B)
+                            )
+                        )
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.35f),
+                                OrangePrimary.copy(alpha = 0.3f),
+                                Color.White.copy(alpha = 0.08f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
                     text = if (poseStatus == NO_PERSON_WARNING || poseStatus == config.poseWarning) poseStatus else exerciseState.feedback,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                     color = if (exerciseState.isPoseReliable) config.accentColor else config.warningColor
                 )
                 Row(
@@ -665,11 +839,14 @@ private fun ExerciseCameraContent(
                     Text(
                         config.angleLabel,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = config.mutedColor
+                        color = Color.White.copy(alpha = 0.7f)
                     )
-                    Text(exerciseState.primaryAngleDegrees?.let { "${it.toInt()}°" } ?: "--",
+                    Text(
+                        exerciseState.primaryAngleDegrees?.let { "${it.toInt()}°" } ?: "--",
                         style = MaterialTheme.typography.titleLarge,
-                        color = Color.White)
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -679,13 +856,14 @@ private fun ExerciseCameraContent(
                     Text(
                         config.phaseLabel,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = config.mutedColor
+                        color = Color.White.copy(alpha = 0.7f)
                     )
                     Text(
                         exerciseState.phase.name.replace('_', ' ').lowercase()
                             .replaceFirstChar { it.uppercase() },
                         style = MaterialTheme.typography.titleMedium,
-                        color = config.accentColor
+                        fontWeight = FontWeight.Bold,
+                        color = config.warningColor
                     )
                 }
                 cameraError?.let {
@@ -693,58 +871,63 @@ private fun ExerciseCameraContent(
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Button(
                         onClick = { isHudVisible = false },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = config.accentColor, contentColor = config.darkColor
+                            containerColor = OrangePrimary, contentColor = Color.White
                         )
-                    ) { Text("Hide Options") }
+                    ) { Text("Hide Options", fontWeight = FontWeight.Bold) }
                     Button(
                         onClick = onBack,
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = config.buttonColor, contentColor = Color.White
+                            containerColor = Color.White.copy(alpha = 0.15f), contentColor = Color.White
                         )
-                    ) { Text("Back") }
+                    ) { Text("Back", fontWeight = FontWeight.Bold) }
                 }
-                Button(
-                    onClick = { isSkeletonVisible = !isSkeletonVisible },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = config.panelColor, contentColor = Color.White
-                    )
-                ) { Text(if (isSkeletonVisible) "Hide Skeleton" else "Show Skeleton") }
-                Button(
-                    onClick = {
-                        exerciseState = detector.reset()
-                        poseStatus =
-                            "Counter reset — ${if (config.type == ExerciseType.SQUAT) "stand upright" else "straighten your arms"} to begin"
-                        cameraError = null
-                        resetMessage = true
-                        resetToastKey++
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = config.panelColor, contentColor = Color.White
-                    )
-                ) { Text("Reset") }
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = { isSkeletonVisible = !isSkeletonVisible },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f), contentColor = Color.White
+                        )
+                    ) { Text(if (isSkeletonVisible) "Hide Skeleton" else "Show Skeleton", fontWeight = FontWeight.Bold) }
+                    Button(
+                        onClick = {
+                            exerciseState = detector.reset()
+                            poseStatus =
+                                "Counter reset — ${if (config.type == ExerciseType.SQUAT) "stand upright" else "straighten your arms"} to begin"
+                            cameraError = null
+                            resetMessage = true
+                            resetToastKey++
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f), contentColor = Color.White
+                        )
+                    ) { Text("Reset", fontWeight = FontWeight.Bold) }
+                }
             }
         } else if (isVerified) {
             Button(
                 onClick = { isHudVisible = true },
-                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
-                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(20.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = config.accentColor, contentColor = config.darkColor
+                    containerColor = OrangePrimary, contentColor = Color.White
                 )
-            ) { Text("Show Options") }
+            ) { Text("Show Options", fontWeight = FontWeight.Bold) }
         }
     }
 }

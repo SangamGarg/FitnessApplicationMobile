@@ -26,8 +26,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 
 // Vibrant Orange Glassmorphism Theme Palette
 private val OrangePrimary = Color(0xFFFF5722)
@@ -53,7 +60,6 @@ val sampleProgressPhotos = listOf(
     ProgressPhoto("8", "Day 100 - Master Level", "Jan 10, 2025", "Ready for advanced workouts")
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     onNavigateToSettings: () -> Unit = {},
@@ -63,14 +69,41 @@ fun ProfileScreen(
     onLogout: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
-    
-    // Smooth Collapse Progress (0f = Expanded card, 1f = Compact top-left header)
-    val collapseProgress by remember {
-        derivedStateOf {
-            if (listState.firstVisibleItemIndex > 0) {
-                1f
-            } else {
-                (listState.firstVisibleItemScrollOffset / 350f).coerceIn(0f, 1f)
+
+    // Header sizes (expanded big card -> compact pinned card)
+    val expandedHeaderHeight = 260.dp
+    val collapsedHeaderHeight = 76.dp
+    val density = LocalDensity.current
+    val collapseRangePx = with(density) {
+        (expandedHeaderHeight - collapsedHeaderHeight).toPx()
+    }
+
+    // 0f = fully expanded, collapseRangePx = fully collapsed
+    var collapsedPx by remember { mutableFloatStateOf(0f) }
+    val collapseProgress = (collapsedPx / collapseRangePx).coerceIn(0f, 1f)
+
+    val nestedScrollConnection = remember(collapseRangePx) {
+        object : NestedScrollConnection {
+            // Scrolling DOWN the page (finger moves up): shrink the header first
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val delta = available.y
+                if (delta >= 0f) return Offset.Zero
+                val old = collapsedPx
+                collapsedPx = (old - delta).coerceIn(0f, collapseRangePx)
+                return Offset(0f, -(collapsedPx - old))
+            }
+
+            // Scrolling back UP: the list reaches the top first, then the header expands
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset {
+                val delta = available.y
+                if (delta <= 0f) return Offset.Zero
+                val old = collapsedPx
+                collapsedPx = (old - delta).coerceIn(0f, collapseRangePx)
+                return Offset(0f, old - collapsedPx)
             }
         }
     }
@@ -134,113 +167,123 @@ fun ProfileScreen(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { innerPadding ->
-            LazyColumn(
-                state = listState,
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 16.dp,
-                    bottom = 4.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .nestedScroll(nestedScrollConnection)
             ) {
-                // Collapsible Motion Profile Header Card
-                item {
+                // Pinned header: big card -> small card (stays anchored at the top)
+                Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
                     GlassCollapsibleProfileCard(
                         userName = "Alex Fitness",
                         userEmail = "alex.fitness@muscleplay.com",
                         membershipStatus = "Pro Member",
                         streakDays = 12,
                         collapseProgress = collapseProgress,
+                        expandedHeight = expandedHeaderHeight,
+                        collapsedHeight = collapsedHeaderHeight,
                         onSettingsClick = onNavigateToSettings
                     )
                 }
 
-                // Progress Gallery Section
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 16.dp,
+                        bottom = 90.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Progress Gallery Section
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Progress Gallery",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            TextButton(onClick = { onNavigateToGallery() }) {
+                                Text(
+                                    "View All",
+                                    color = OrangeSecondary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        GlassProgressGallerySection(
+                            photos = sampleProgressPhotos.take(4),
+                            onImageClick = { photo ->
+                                snackbarMessage = "Viewing ${photo.title}"
+                            }
+                        )
+                    }
+
+                    item {
                         Text(
-                            text = "Progress Gallery",
+                            text = "App & Account Options",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = Color.White,
+                            modifier = Modifier.padding(top = 8.dp)
                         )
-                        TextButton(onClick = { onNavigateToGallery() }) {
-                            Text("View All", color = OrangeSecondary, fontWeight = FontWeight.Bold)
-                        }
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    GlassProgressGallerySection(
-                        photos = sampleProgressPhotos.take(4),
-                        onImageClick = { photo ->
-                            snackbarMessage = "Viewing ${photo.title}"
+
+                    // Options List
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            GlassProfileMenuItem(
+                                icon = Icons.Default.Settings,
+                                title = "Settings & Preferences",
+                                subtitle = "Preferences, notifications, theme",
+                                onClick = { onNavigateToSettings() }
+                            )
+                            GlassProfileMenuItem(
+                                icon = Icons.Default.HealthAndSafety,
+                                title = "Self-Diagnostics Check",
+                                subtitle = "Verify camera, sensors, and app health",
+                                onClick = { onNavigateToDiagnostics() }
+                            )
+                            GlassProfileMenuItem(
+                                icon = Icons.AutoMirrored.Filled.HelpOutline,
+                                title = "Help & Support",
+                                subtitle = "FAQs, contact support, guides",
+                                onClick = { onNavigateToHelp() }
+                            )
+                            GlassProfileMenuItem(
+                                icon = Icons.Default.Feedback,
+                                title = "Tell Us What You Think",
+                                subtitle = "Share your feedback & feature requests",
+                                onClick = { showFeedbackBottomSheet = true }
+                            )
+                            GlassProfileMenuItem(
+                                icon = Icons.Default.Star,
+                                title = "Rate and Review Us",
+                                subtitle = "Support MusclePlay on the Play Store",
+                                onClick = { showRateDialog = true }
+                            )
+                            GlassProfileMenuItem(
+                                icon = Icons.Default.Share,
+                                title = "Follow Us On",
+                                subtitle = "Instagram, YouTube, X, and Community",
+                                onClick = { showFollowDialog = true }
+                            )
+                            GlassProfileMenuItem(
+                                icon = Icons.AutoMirrored.Filled.Logout,
+                                title = "Logout",
+                                subtitle = "Sign out of your MusclePlay account",
+                                tint = Color(0xFFFF5252),
+                                onClick = { showLogoutDialog = true }
+                            )
                         }
-                    )
-                }
-
-                item {
-                    Text(
-                        text = "App & Account Options",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-
-                // Options List
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        GlassProfileMenuItem(
-                            icon = Icons.Default.Settings,
-                            title = "Settings & Preferences",
-                            subtitle = "Preferences, notifications, theme",
-                            onClick = { onNavigateToSettings() }
-                        )
-                        GlassProfileMenuItem(
-                            icon = Icons.Default.HealthAndSafety,
-                            title = "Self-Diagnostics Check",
-                            subtitle = "Verify camera, sensors, and app health",
-                            onClick = { onNavigateToDiagnostics() }
-                        )
-                        GlassProfileMenuItem(
-                            icon = Icons.AutoMirrored.Filled.HelpOutline,
-                            title = "Help & Support",
-                            subtitle = "FAQs, contact support, guides",
-                            onClick = { onNavigateToHelp() }
-                        )
-                        GlassProfileMenuItem(
-                            icon = Icons.Default.Feedback,
-                            title = "Tell Us What You Think",
-                            subtitle = "Share your feedback & feature requests",
-                            onClick = { showFeedbackBottomSheet = true }
-                        )
-                        GlassProfileMenuItem(
-                            icon = Icons.Default.Star,
-                            title = "Rate and Review Us",
-                            subtitle = "Support MusclePlay on the Play Store",
-                            onClick = { showRateDialog = true }
-                        )
-                        GlassProfileMenuItem(
-                            icon = Icons.Default.Share,
-                            title = "Follow Us On",
-                            subtitle = "Instagram, YouTube, X, and Community",
-                            onClick = { showFollowDialog = true }
-                        )
-                        GlassProfileMenuItem(
-                            icon = Icons.AutoMirrored.Filled.Logout,
-                            title = "Logout",
-                            subtitle = "Sign out of your MusclePlay account",
-                            tint = Color(0xFFFF5252),
-                            onClick = { showLogoutDialog = true }
-                        )
                     }
                 }
             }
@@ -348,21 +391,27 @@ fun GlassCollapsibleProfileCard(
     membershipStatus: String,
     streakDays: Int,
     collapseProgress: Float,
-    onSettingsClick: () -> Unit
+    expandedHeight: Dp,
+    collapsedHeight: Dp,
+    onSettingsClick: () -> Unit,
 ) {
+    val cardHeight = lerp(expandedHeight, collapsedHeight, collapseProgress)
     val avatarSize = (84.dp - (42.dp * collapseProgress))
     val avatarIconSize = (50.dp - (24.dp * collapseProgress))
     val cardPadding = (22.dp - (10.dp * collapseProgress))
     val cornerRadius = (28.dp - (8.dp * collapseProgress))
 
     GlassContainer(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(cardHeight), // animates with scroll
         shape = RoundedCornerShape(cornerRadius)
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(cardPadding)
+                .fillMaxSize()
+                .padding(cardPadding),
+            contentAlignment = Alignment.Center
         ) {
             if (collapseProgress < 0.5f) {
                 // Expanded Full Card Layout
@@ -377,7 +426,14 @@ fun GlassCollapsibleProfileCard(
                         modifier = Modifier
                             .size(avatarSize)
                             .clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(OrangePrimary, OrangeSecondary))),
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        OrangePrimary,
+                                        OrangeSecondary
+                                    )
+                                )
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -414,7 +470,7 @@ fun GlassCollapsibleProfileCard(
                     }
                 }
             } else {
-                // Compact Motion Header Layout (Positioned Top Left)
+                // Compact Header Layout (pinned at the top)
                 val alpha = ((collapseProgress - 0.5f) * 2f).coerceIn(0f, 1f)
                 Row(
                     modifier = Modifier
@@ -432,7 +488,14 @@ fun GlassCollapsibleProfileCard(
                             modifier = Modifier
                                 .size(42.dp)
                                 .clip(CircleShape)
-                                .background(Brush.linearGradient(listOf(OrangePrimary, OrangeSecondary))),
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            OrangePrimary,
+                                            OrangeSecondary
+                                        )
+                                    )
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -444,17 +507,46 @@ fun GlassCollapsibleProfileCard(
                         }
 
                         Column {
-                            Text(
-                                text = userName,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = userName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                // Membership status pill
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(
+                                            Brush.linearGradient(
+                                                listOf(OrangePrimary, OrangeSecondary)
+                                            )
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = membershipStatus,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
                             Text(
                                 text = "$userEmail • $streakDays Days 🔥",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = OrangeSecondary,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }

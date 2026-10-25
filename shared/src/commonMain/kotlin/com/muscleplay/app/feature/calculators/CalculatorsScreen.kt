@@ -77,7 +77,7 @@ fun CalculatorsScreen() {
                 .fillMaxSize()
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
-            contentPadding = PaddingValues(top = 24.dp, bottom = 32.dp)
+            contentPadding = PaddingValues(top = 24.dp, bottom = 90.dp)
         ) {
             item {
                 Column {
