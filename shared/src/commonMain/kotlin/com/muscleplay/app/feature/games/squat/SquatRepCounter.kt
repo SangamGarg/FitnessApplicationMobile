@@ -39,12 +39,13 @@ data class SquatState(
 )
 
 
+//TODO THE THRESHOLD NEEDS TO BE DISCUSSED
 class SquatRepCounter(
     private val minimumVisibility: Float = 0.6f,
     private val standingAngle: Float = 145f,
-    private val squatAngle: Float = 90f,
+    private val squatAngle: Float = 100f,
     private val angleWindowSize: Int = 3,
-    private val bottomFramesRequired: Int = 3,
+    private val bottomFramesRequired: Int = 2,
     private val standingFramesRequired: Int = 2,
     private val cooldownFrames: Int = 6,
     private val minimumHipDescentRatio: Float = 0.03f,

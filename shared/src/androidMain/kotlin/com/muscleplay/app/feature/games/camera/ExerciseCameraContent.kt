@@ -41,6 +41,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -181,23 +182,17 @@ fun ExerciseCameraScreen(
 
     if (showRulesDialog) {
         ExerciseRulesDialog(
-            title = config.title,
-            rules = config.rules,
-            onContinue = { dontShowAgain ->
+            title = config.title, rules = config.rules, onContinue = { dontShowAgain ->
                 rulesPreferences.setDontShowAgain(
-                    exerciseId = config.exerciseId,
-                    dontShowAgain = dontShowAgain
+                    exerciseId = config.exerciseId, dontShowAgain = dontShowAgain
                 )
                 showRulesDialog = false
-            }
-        )
+            })
         return
     }
 
     ExerciseCameraContent(
-        detector = detector,
-        config = config,
-        onBack = onBack
+        detector = detector, config = config, onBack = onBack
     )
 }
 
@@ -213,8 +208,9 @@ private fun ExerciseCameraContent(
 
     var cameraGranted by remember {
         mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                    PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
         )
     }
     var cameraError by remember { mutableStateOf<String?>(null) }
@@ -228,7 +224,7 @@ private fun ExerciseCameraContent(
     var rightHandRaisedSinceMs by remember { mutableStateOf<Long?>(null) }
     var rightHandLastSeenMs by remember { mutableStateOf<Long?>(null) }
     var rightHandRaisedFrames by remember { mutableIntStateOf(0) }
-    var lastGestureRevalidationMs by remember { mutableStateOf(0L) }
+    var lastGestureRevalidationMs by remember { mutableLongStateOf(0L) }
 
     val livenessEvaluator = remember {
         LivenessChallengeEvaluator(
@@ -250,8 +246,8 @@ private fun ExerciseCameraContent(
 
     val skeletonColor = when {
         !exerciseState.isPoseReliable -> config.errorColor
-        exerciseState.phase == ExercisePhase.WAITING_FOR_START ||
-                exerciseState.phase == ExercisePhase.ACTIVE -> config.warningColor
+        exerciseState.phase == ExercisePhase.WAITING_FOR_START || exerciseState.phase == ExercisePhase.ACTIVE -> config.warningColor
+
         else -> config.accentColor
     }
 
@@ -261,7 +257,8 @@ private fun ExerciseCameraContent(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         cameraGranted = granted
-        cameraError = if (granted) null else "Camera permission is required for ${config.title.lowercase()} detection."
+        cameraError =
+            if (granted) null else "Camera permission is required for ${config.title.lowercase()} detection."
     }
     val previewView = remember {
         PreviewView(context).apply {
@@ -306,13 +303,15 @@ private fun ExerciseCameraContent(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(cameraError ?: "MusclePlay needs camera access to detect your ${config.title.lowercase()} exercise.")
+            Text(
+                cameraError
+                    ?: "MusclePlay needs camera access to detect your ${config.title.lowercase()} exercise."
+            )
             Button(
                 onClick = {
                     cameraError = null
                     permissionLauncher.launch(Manifest.permission.CAMERA)
-                }
-            ) { Text("Grant camera permission") }
+                }) { Text("Grant camera permission") }
             Button(onClick = onBack) { Text("Back") }
         }
         return
@@ -334,10 +333,7 @@ private fun ExerciseCameraContent(
                             livenessState = livenessEvaluator.onPoseLost()
                             exerciseState = detector.onPoseLost()
                             poseStatus = NO_PERSON_WARNING
-                        } else if (
-                            livenessState.status == LivenessStatus.VERIFIED &&
-                            livenessState.canCountRepetitions
-                        ) {
+                        } else if (livenessState.status == LivenessStatus.VERIFIED && livenessState.canCountRepetitions) {
                             val updatedState = detector.processPose(pose)
                             exerciseState = updatedState
                             poseStatus = when {
@@ -348,21 +344,24 @@ private fun ExerciseCameraContent(
                             when (livenessState.status) {
                                 LivenessStatus.NOT_STARTED,
                                 LivenessStatus.CHALLENGE_REQUIRED,
-                                LivenessStatus.CHALLENGE_IN_PROGRESS -> {
+                                LivenessStatus.CHALLENGE_IN_PROGRESS,
+                                    -> {
                                     val previousStatus = livenessState.status
-                                    livenessState = livenessEvaluator.process(pose.toLivenessPose(), nowMs)
+                                    livenessState =
+                                        livenessEvaluator.process(pose.toLivenessPose(), nowMs)
                                     val verificationJustSucceeded =
-                                        previousStatus != LivenessStatus.VERIFIED &&
-                                                livenessState.status == LivenessStatus.VERIFIED &&
-                                                livenessState.canCountRepetitions
+                                        previousStatus != LivenessStatus.VERIFIED && livenessState.status == LivenessStatus.VERIFIED && livenessState.canCountRepetitions
                                     if (verificationJustSucceeded) {
                                         verificationSuccessMessage = true
                                         verificationSuccessToastKey++
                                     }
                                     poseStatus = livenessState.instruction
                                 }
+
                                 LivenessStatus.PAUSED,
-                                LivenessStatus.FAILED -> poseStatus = livenessState.instruction
+                                LivenessStatus.FAILED,
+                                    -> poseStatus = livenessState.instruction
+
                                 LivenessStatus.VERIFIED -> poseStatus = "Preparing verification..."
                             }
                             // Keep the detector's existing rep count; don't process verification frames.
@@ -381,18 +380,16 @@ private fun ExerciseCameraContent(
                         poseLandmarks = landmarks.orEmpty()
                         val currentLandmarks = landmarks.orEmpty()
                         val nowMs = SystemClock.uptimeMillis()
-                        val canRetryNow = livenessState.status == LivenessStatus.PAUSED ||
-                                livenessState.status == LivenessStatus.FAILED
+                        val canRetryNow =
+                            livenessState.status == LivenessStatus.PAUSED || livenessState.status == LivenessStatus.FAILED
 
                         if (canRetryNow) {
                             val rightShoulder = currentLandmarks.getOrNull(12)
                             val rightWrist = currentLandmarks.getOrNull(16)
                             val landmarksReliable =
-                                rightShoulder != null && rightWrist != null &&
-                                        rightShoulder.visibility >= 0.45f &&
-                                        rightWrist.visibility >= 0.45f
-                            val isRightHandRaised = landmarksReliable &&
-                                    rightWrist!!.y < rightShoulder!!.y - 0.05f
+                                rightShoulder != null && rightWrist != null && rightShoulder.visibility >= 0.45f && rightWrist.visibility >= 0.45f
+                            val isRightHandRaised =
+                                landmarksReliable && rightWrist.y < rightShoulder.y - 0.05f
 
                             if (isRightHandRaised) {
                                 rightHandLastSeenMs = nowMs
@@ -406,7 +403,8 @@ private fun ExerciseCameraContent(
                                 val heldDurationMs = nowMs - (rightHandRaisedSinceMs ?: nowMs)
                                 val enoughFrames = rightHandRaisedFrames >= 15
                                 val enoughTime = heldDurationMs >= RETRY_HOLD_MS
-                                val cooldownFinished = nowMs - lastGestureRevalidationMs >= RETRY_COOLDOWN_MS
+                                val cooldownFinished =
+                                    nowMs - lastGestureRevalidationMs >= RETRY_COOLDOWN_MS
 
                                 if (enoughFrames && enoughTime && cooldownFinished) {
                                     lastGestureRevalidationMs = nowMs
@@ -432,8 +430,7 @@ private fun ExerciseCameraContent(
                             rightHandRaisedFrames = 0
                         }
                     }
-                }
-            )
+                })
 
             val providerFuture = ProcessCameraProvider.getInstance(context)
             providerFuture.addListener({
@@ -446,13 +443,12 @@ private fun ExerciseCameraContent(
                     }
                     val analysis = ImageAnalysis.Builder()
                         .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .build()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
                     analysis.setAnalyzer(analysisExecutor) { imageProxy ->
                         try {
                             val bitmap = imageProxy.toRgbaBitmap()
                             val mpImage = BitmapImageBuilder(bitmap).build()
-                            poseHelper?.detect(mpImage, SystemClock.uptimeMillis())
+                            poseHelper.detect(mpImage, SystemClock.uptimeMillis())
                         } catch (exception: Exception) {
                             Log.e(CAMERA_TAG, "Frame processing failed", exception)
                         } finally {
@@ -461,10 +457,7 @@ private fun ExerciseCameraContent(
                     }
                     provider.unbindAll()
                     provider.bindToLifecycle(
-                        lifecycleOwner,
-                        CameraSelector.DEFAULT_FRONT_CAMERA,
-                        preview,
-                        analysis
+                        lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis
                     )
                 } catch (exception: Exception) {
                     mainHandler.post {
@@ -487,10 +480,10 @@ private fun ExerciseCameraContent(
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
 
-        val isVerified = livenessState.status == LivenessStatus.VERIFIED &&
-                livenessState.canCountRepetitions
-        val canRetry = livenessState.status == LivenessStatus.PAUSED ||
-                livenessState.status == LivenessStatus.FAILED
+        val isVerified =
+            livenessState.status == LivenessStatus.VERIFIED && livenessState.canCountRepetitions
+        val canRetry =
+            livenessState.status == LivenessStatus.PAUSED || livenessState.status == LivenessStatus.FAILED
         val shouldShowSkeleton = !isVerified || isSkeletonVisible
 
         if (shouldShowSkeleton) {
@@ -506,12 +499,9 @@ private fun ExerciseCameraContent(
 
         if (!isVerified) {
             Column(
-                modifier = Modifier.align(Alignment.Center)
-                    .padding(horizontal = 24.dp)
-                    .fillMaxWidth()
-                    .background(Color(0xCC101820), RoundedCornerShape(16.dp))
-                    .border(1.dp, Color(0x557CF5B4), RoundedCornerShape(16.dp))
-                    .padding(20.dp),
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp)
+                    .fillMaxWidth().background(Color(0xCC101820), RoundedCornerShape(16.dp))
+                    .border(1.dp, Color(0x557CF5B4), RoundedCornerShape(16.dp)).padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -522,8 +512,7 @@ private fun ExerciseCameraContent(
                         strokeWidth = 3.dp
                     )
                     Text(
-                        text = if (livenessState.status == LivenessStatus.CHALLENGE_IN_PROGRESS)
-                            "Verifying your movement..." else "Preparing verification...",
+                        text = if (livenessState.status == LivenessStatus.CHALLENGE_IN_PROGRESS) "Verifying your movement..." else "Preparing verification...",
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold
@@ -534,8 +523,7 @@ private fun ExerciseCameraContent(
                     }
                 } else {
                     Text(
-                        text = if (livenessState.status == LivenessStatus.FAILED)
-                            "Verification failed" else "Verification paused",
+                        text = if (livenessState.status == LivenessStatus.FAILED) "Verification failed" else "Verification paused",
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold
@@ -555,11 +543,8 @@ private fun ExerciseCameraContent(
                             livenessState = livenessEvaluator.state
                             poseStatus = livenessState.instruction
                             warningMessage = null
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = config.accentColor,
-                            contentColor = config.darkColor
+                        }, shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(
+                            containerColor = config.accentColor, contentColor = config.darkColor
                         )
                     ) { Text("Revalidate", fontWeight = FontWeight.Bold) }
                     Text(
@@ -573,17 +558,23 @@ private fun ExerciseCameraContent(
 
         if (verificationSuccessMessage) {
             Row(
-                modifier = Modifier.align(Alignment.Center)
-                    .padding(horizontal = 24.dp)
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp)
                     .background(Color(0xEE163D2D), RoundedCornerShape(12.dp))
                     .border(1.dp, config.accentColor, RoundedCornerShape(12.dp))
                     .padding(horizontal = 18.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("✓", color = config.accentColor, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "✓", color = config.accentColor, fontSize = 22.sp, fontWeight = FontWeight.Bold
+                )
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Verification Successful!", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Verification Successful!",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                     Text("Start exercising!", color = config.mutedColor, fontSize = 13.sp)
                 }
             }
@@ -591,16 +582,22 @@ private fun ExerciseCameraContent(
 
         if (resetMessage) {
             Row(
-                modifier = Modifier.align(Alignment.TopCenter)
-                    .padding(top = 100.dp)
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 100.dp)
                     .background(Color(0xEE163D2D), RoundedCornerShape(12.dp))
                     .border(1.dp, config.accentColor, RoundedCornerShape(12.dp))
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("✓", color = config.accentColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text("Reps reset successfully!", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text(
+                    "✓", color = config.accentColor, fontSize = 18.sp, fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Reps reset successfully!",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
             }
         }
 
@@ -620,8 +617,7 @@ private fun ExerciseCameraContent(
         }
 
         Column(
-            modifier = Modifier.align(Alignment.TopEnd)
-                .padding(8.dp)
+            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
                 .background(config.darkColor, RoundedCornerShape(18.dp))
                 .padding(horizontal = 24.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -639,31 +635,25 @@ private fun ExerciseCameraContent(
                 shape = CircleShape,
                 contentPadding = PaddingValues(0.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = config.buttonColor,
-                    contentColor = Color.White
+                    containerColor = config.buttonColor, contentColor = Color.White
                 )
             ) { Text("?", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
         }
 
         if (showExerciseHelp) {
             ExerciseHelpDialog(
-                content = config.helpContent,
-                onDismiss = { showExerciseHelp = false }
-            )
+                content = config.helpContent, onDismiss = { showExerciseHelp = false })
         }
 
         if (isVerified && isHudVisible) {
             Column(
-                modifier = Modifier.align(Alignment.BottomCenter)
-                    .fillMaxWidth()
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 12.dp)
-                    .background(config.darkColor, RoundedCornerShape(18.dp))
-                    .padding(12.dp),
+                    .background(config.darkColor, RoundedCornerShape(18.dp)).padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = if (poseStatus == NO_PERSON_WARNING || poseStatus == config.poseWarning)
-                        poseStatus else exerciseState.feedback,
+                    text = if (poseStatus == NO_PERSON_WARNING || poseStatus == config.poseWarning) poseStatus else exerciseState.feedback,
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (exerciseState.isPoseReliable) config.accentColor else config.warningColor
                 )
@@ -672,21 +662,28 @@ private fun ExerciseCameraContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(config.angleLabel, style = MaterialTheme.typography.bodyMedium, color = config.mutedColor)
                     Text(
-                        exerciseState.primaryAngleDegrees?.let { "${it.toInt()}°" } ?: "--",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.White
+                        config.angleLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = config.mutedColor
                     )
+                    Text(exerciseState.primaryAngleDegrees?.let { "${it.toInt()}°" } ?: "--",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White)
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(config.phaseLabel, style = MaterialTheme.typography.bodyMedium, color = config.mutedColor)
                     Text(
-                        exerciseState.phase.name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() },
+                        config.phaseLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = config.mutedColor
+                    )
+                    Text(
+                        exerciseState.phase.name.replace('_', ' ').lowercase()
+                            .replaceFirstChar { it.uppercase() },
                         style = MaterialTheme.typography.titleMedium,
                         color = config.accentColor
                     )
@@ -703,8 +700,7 @@ private fun ExerciseCameraContent(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = config.accentColor,
-                            contentColor = config.darkColor
+                            containerColor = config.accentColor, contentColor = config.darkColor
                         )
                     ) { Text("Hide Options") }
                     Button(
@@ -712,8 +708,7 @@ private fun ExerciseCameraContent(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = config.buttonColor,
-                            contentColor = Color.White
+                            containerColor = config.buttonColor, contentColor = Color.White
                         )
                     ) { Text("Back") }
                 }
@@ -722,14 +717,14 @@ private fun ExerciseCameraContent(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = config.panelColor,
-                        contentColor = Color.White
+                        containerColor = config.panelColor, contentColor = Color.White
                     )
                 ) { Text(if (isSkeletonVisible) "Hide Skeleton" else "Show Skeleton") }
                 Button(
                     onClick = {
                         exerciseState = detector.reset()
-                        poseStatus = "Counter reset — ${if (config.type == ExerciseType.SQUAT) "stand upright" else "straighten your arms"} to begin"
+                        poseStatus =
+                            "Counter reset — ${if (config.type == ExerciseType.SQUAT) "stand upright" else "straighten your arms"} to begin"
                         cameraError = null
                         resetMessage = true
                         resetToastKey++
@@ -737,8 +732,7 @@ private fun ExerciseCameraContent(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = config.panelColor,
-                        contentColor = Color.White
+                        containerColor = config.panelColor, contentColor = Color.White
                     )
                 ) { Text("Reset") }
             }
@@ -748,8 +742,7 @@ private fun ExerciseCameraContent(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = config.accentColor,
-                    contentColor = config.darkColor
+                    containerColor = config.accentColor, contentColor = config.darkColor
                 )
             ) { Text("Show Options") }
         }
@@ -763,9 +756,7 @@ private fun ImageProxy.toRgbaBitmap(): Bitmap {
     buffer.rewind()
     val expectedRowBytes = width * 4
 
-    if (plane.pixelStride == 4 && plane.rowStride == expectedRowBytes &&
-        buffer.remaining() >= height * expectedRowBytes
-    ) {
+    if (plane.pixelStride == 4 && plane.rowStride == expectedRowBytes && buffer.remaining() >= height * expectedRowBytes) {
         return createBitmap(width, height).apply { copyPixelsFromBuffer(buffer) }
     }
 
@@ -780,8 +771,7 @@ private fun ImageProxy.toRgbaBitmap(): Bitmap {
                 val green = rgba[index + 1].toInt() and 0xFF
                 val blue = rgba[index + 2].toInt() and 0xFF
                 val alpha = rgba[index + 3].toInt() and 0xFF
-                pixels[y * width + x] =
-                    (alpha shl 24) or (red shl 16) or (green shl 8) or blue
+                pixels[y * width + x] = (alpha shl 24) or (red shl 16) or (green shl 8) or blue
             }
         }
     }
