@@ -34,6 +34,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.muscleplay.app.core.di.AppContainer
+import com.muscleplay.app.feature.auth.OtpVerificationScreen
 import com.muscleplay.app.feature.auth.SignInScreen
 import com.muscleplay.app.feature.auth.SignUpScreen
 import com.muscleplay.app.feature.calculators.CalculatorsScreen
@@ -43,6 +44,7 @@ import com.muscleplay.app.feature.games.pushup.PushUpCameraScreen
 import com.muscleplay.app.feature.games.squat.SquatCameraScreen
 import com.muscleplay.app.feature.home.HomeScreen
 import com.muscleplay.app.feature.onboarding.OnboardingScreen
+import com.muscleplay.app.feature.onboarding.rememberOnboardingPreferences
 import com.muscleplay.app.feature.profile.FullPhotoGalleryScreen
 import com.muscleplay.app.feature.profile.HelpSupportScreen
 import com.muscleplay.app.feature.profile.MyTicketsScreen
@@ -62,6 +64,7 @@ private object Routes {
     const val ONBOARDING = "onboarding"
     const val SIGN_IN = "sign_in"
     const val SIGN_UP = "sign_up"
+    const val OTP_VERIFICATION = "otp_verification"
 
     const val SQUAT_MASTER_ROUTE = "squat_master"
     const val REP_CHALLENGE_ROUTE = "rep_challenge"
@@ -109,6 +112,7 @@ fun MusclePlayNavigation(
     appContainer: AppContainer,
 ) {
     val navController = rememberNavController()
+    val onboardingPreferences = rememberOnboardingPreferences()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val currentRoute = currentDestination?.route
@@ -118,6 +122,7 @@ fun MusclePlayNavigation(
         Routes.ONBOARDING,
         Routes.SIGN_IN,
         Routes.SIGN_UP,
+        Routes.OTP_VERIFICATION,
         Routes.SQUAT_MASTER_ROUTE,
         Routes.REP_CHALLENGE_ROUTE,
         Routes.PUSH_UP_MASTER_ROUTE,
@@ -128,7 +133,7 @@ fun MusclePlayNavigation(
         Routes.PROFILE_RAISE_TICKET,
         Routes.PROFILE_MY_TICKETS
     )
-    val shouldHideBottomBar = currentRoute in bottomBarHiddenRoutes
+    val shouldHideBottomBar = currentRoute in bottomBarHiddenRoutes || currentRoute?.startsWith(Routes.OTP_VERIFICATION) == true
 
     val selectedIndex = remember(currentDestination) {
         val activeRoute = tabs.firstOrNull { tab ->
@@ -186,7 +191,7 @@ fun MusclePlayNavigation(
             composable(Routes.SPLASH) {
                 SplashScreen(
                     onSplashFinished = {
-                        val destination = if (appContainer.onboardingPreferences.isOnboardingCompleted()) {
+                        val destination = if (onboardingPreferences.isOnboardingCompleted()) {
                             Routes.SIGN_IN
                         } else {
                             Routes.ONBOARDING
@@ -202,7 +207,7 @@ fun MusclePlayNavigation(
             composable(Routes.ONBOARDING) {
                 OnboardingScreen(
                     onOnboardingFinished = {
-                        appContainer.onboardingPreferences.setOnboardingCompleted(true)
+                        onboardingPreferences.setOnboardingCompleted(true)
                         navController.navigate(Routes.SIGN_IN) {
                             popUpTo(Routes.ONBOARDING) {
                                 inclusive = true
@@ -227,14 +232,26 @@ fun MusclePlayNavigation(
             }
             composable(Routes.SIGN_UP) {
                 SignUpScreen(
-                    onSignUpSuccess = {
+                    onNavigateToOtp = { email ->
+                        navController.navigate("${Routes.OTP_VERIFICATION}/$email")
+                    },
+                    onNavigateToSignIn = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+            composable("${Routes.OTP_VERIFICATION}/{email}") { backStackEntry ->
+                val userEmail = backStackEntry.savedStateHandle.get<String>("email") ?: "user@muscleplay.com"
+                OtpVerificationScreen(
+                    userEmail = userEmail,
+                    onOtpVerified = {
                         navController.navigate(Routes.HOME) {
                             popUpTo(Routes.SIGN_IN) {
                                 inclusive = true
                             }
                         }
                     },
-                    onNavigateToSignIn = {
+                    onBack = {
                         navController.popBackStack()
                     }
                 )

@@ -1,11 +1,11 @@
 package com.muscleplay.app.feature.onboarding
 
-class OnboardingPreferences {
-    private var isCompleted: Boolean = false
+import androidx.compose.runtime.Composable
 
-    fun isOnboardingCompleted(): Boolean = isCompleted
-
-    fun setOnboardingCompleted(completed: Boolean) {
-        isCompleted = completed
-    }
+interface OnboardingPreferences {
+    fun isOnboardingCompleted(): Boolean
+    fun setOnboardingCompleted(completed: Boolean)
 }
+
+@Composable
+expect fun rememberOnboardingPreferences(): OnboardingPreferences

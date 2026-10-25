@@ -40,15 +40,14 @@ private val DarkBackground = Color(0xFF0F0F17)
 
 @Composable
 fun SignUpScreen(
-    onSignUpSuccess: () -> Unit,
-    onNavigateToSignIn: () -> Unit,
+    onNavigateToOtp: (email: String) -> Unit = {},
+    onNavigateToSignIn: () -> Unit = {},
 ) {
     val fullName = remember { FieldState() }
     val email = remember { FieldState() }
     val password = remember { FieldState() }
     val confirmPassword = remember { FieldState() }
     var isPasswordVisible by remember { mutableStateOf(false) }
-    // Consent must be given explicitly, so the box starts unchecked
     var termsAccepted by remember { mutableStateOf(false) }
     var showTermsDialog by remember { mutableStateOf(false) }
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
@@ -86,7 +85,7 @@ fun SignUpScreen(
         if (hasErrors) {
             snackbarMessage = "Please fix the highlighted fields."
         } else {
-            onSignUpSuccess()
+            onNavigateToOtp(email.text)
         }
     }
 
@@ -133,224 +132,243 @@ fun SignUpScreen(
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
-            LazyColumn(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(horizontal = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                contentPadding = PaddingValues(vertical = 32.dp)
+                    .consumeWindowInsets(innerPadding)
+                    .imePadding()
             ) {
-                // Header Branding
-                item {
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(OrangePrimary, OrangeSecondary))),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PersonAdd,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(38.dp)
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    contentPadding = PaddingValues(vertical = 32.dp)
+                ) {
+                    // Header Branding
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            OrangePrimary,
+                                            OrangeSecondary
+                                        )
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PersonAdd,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(38.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        Text(
+                            text = "Join MusclePlay 🔥",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
+                            modifier = Modifier.clickable {
+                                onNavigateToOtp(email.text)
+                            }
                         )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = "Create your account for AI pose tracking",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.7f)
+                        )
+
+                        Spacer(modifier = Modifier.height(28.dp))
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    // Glass Inputs Card
+                    item {
+                        GlassCardContainer {
+                            Column(
+                                modifier = Modifier.padding(22.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                // Full Name
+                                AuthTextField(
+                                    value = fullName.text,
+                                    onValueChange = {
+                                        if (it.length <= AuthValidator.MAX_NAME_LENGTH) fullName.text =
+                                            it
+                                    },
+                                    label = "Full Name",
+                                    leadingIcon = Icons.Default.Person,
+                                    errorText = visibleNameError,
+                                    keyboardOptions = KeyboardOptions(
+                                        capitalization = KeyboardCapitalization.Words,
+                                        keyboardType = KeyboardType.Text,
+                                        imeAction = ImeAction.Next
+                                    ),
+                                    onFocusChanged = { fullName.onFocusChanged(it) }
+                                )
 
-                    Text(
-                        text = "Join MusclePlay 🔥",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
-                    )
+                                // Email Input
+                                AuthTextField(
+                                    value = email.text,
+                                    onValueChange = { input ->
+                                        email.text = input
+                                            .filter { !it.isWhitespace() }
+                                            .take(AuthValidator.MAX_EMAIL_LENGTH)
+                                    },
+                                    label = "Email Address",
+                                    leadingIcon = Icons.Default.Email,
+                                    errorText = visibleEmailError,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Email,
+                                        imeAction = ImeAction.Next
+                                    ),
+                                    onFocusChanged = { email.onFocusChanged(it) }
+                                )
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                                // Password Input
+                                AuthTextField(
+                                    value = password.text,
+                                    onValueChange = { input ->
+                                        password.text = input
+                                            .filter { !it.isWhitespace() }
+                                            .take(AuthValidator.MAX_PASSWORD_LENGTH)
+                                    },
+                                    label = "Password",
+                                    leadingIcon = Icons.Default.Lock,
+                                    errorText = visiblePasswordError,
+                                    trailingIcon = {
+                                        IconButton(onClick = {
+                                            isPasswordVisible = !isPasswordVisible
+                                        }) {
+                                            Icon(
+                                                imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                                contentDescription = if (isPasswordVisible) "Hide password" else "Show password",
+                                                tint = Color.White.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                    },
+                                    visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Password,
+                                        imeAction = ImeAction.Next
+                                    ),
+                                    onFocusChanged = { password.onFocusChanged(it) }
+                                )
 
-                    Text(
-                        text = "Create your account for AI pose tracking",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.7f)
-                    )
+                                // Live password checklist - ticks as each condition is satisfied
+                                PasswordRequirementsList(
+                                    rules = passwordRules,
+                                    showFailures = password.touched
+                                )
 
-                    Spacer(modifier = Modifier.height(28.dp))
-                }
+                                // Confirm Password Input
+                                AuthTextField(
+                                    value = confirmPassword.text,
+                                    onValueChange = { input ->
+                                        confirmPassword.text = input
+                                            .filter { !it.isWhitespace() }
+                                            .take(AuthValidator.MAX_PASSWORD_LENGTH)
+                                    },
+                                    label = "Confirm Password",
+                                    leadingIcon = Icons.Default.LockReset,
+                                    errorText = visibleConfirmError,
+                                    visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Password,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                                    onFocusChanged = { confirmPassword.onFocusChanged(it) }
+                                )
 
-                // Glass Inputs Card
-                item {
-                    GlassCardContainer {
-                        Column(
-                            modifier = Modifier.padding(22.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            // Full Name
-                            AuthTextField(
-                                value = fullName.text,
-                                onValueChange = {
-                                    if (it.length <= AuthValidator.MAX_NAME_LENGTH) fullName.text = it
-                                },
-                                label = "Full Name",
-                                leadingIcon = Icons.Default.Person,
-                                errorText = visibleNameError,
-                                keyboardOptions = KeyboardOptions(
-                                    capitalization = KeyboardCapitalization.Words,
-                                    keyboardType = KeyboardType.Text,
-                                    imeAction = ImeAction.Next
-                                ),
-                                onFocusChanged = { fullName.onFocusChanged(it) }
-                            )
-
-                            // Email Input (email only, no username)
-                            AuthTextField(
-                                value = email.text,
-                                onValueChange = { input ->
-                                    email.text = input
-                                        .filter { !it.isWhitespace() }
-                                        .take(AuthValidator.MAX_EMAIL_LENGTH)
-                                },
-                                label = "Email Address",
-                                leadingIcon = Icons.Default.Email,
-                                errorText = visibleEmailError,
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Email,
-                                    imeAction = ImeAction.Next
-                                ),
-                                onFocusChanged = { email.onFocusChanged(it) }
-                            )
-
-                            // Password Input
-                            AuthTextField(
-                                value = password.text,
-                                onValueChange = { input ->
-                                    // Spaces aren't allowed in passwords
-                                    password.text = input
-                                        .filter { !it.isWhitespace() }
-                                        .take(AuthValidator.MAX_PASSWORD_LENGTH)
-                                },
-                                label = "Password",
-                                leadingIcon = Icons.Default.Lock,
-                                errorText = visiblePasswordError,
-                                trailingIcon = {
-                                    IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
-                                        Icon(
-                                            imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                            contentDescription = if (isPasswordVisible) "Hide password" else "Show password",
-                                            tint = Color.White.copy(alpha = 0.6f)
+                                // Terms Checkbox & Clickable Label
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = termsAccepted,
+                                        onCheckedChange = { termsAccepted = it },
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor = OrangePrimary,
+                                            uncheckedColor = Color.White.copy(alpha = 0.5f)
+                                        )
+                                    )
+                                    Row {
+                                        Text(
+                                            text = "I agree to ",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color.White.copy(alpha = 0.8f)
+                                        )
+                                        Text(
+                                            text = "Terms & Privacy Policy",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = OrangeSecondary,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.clickable { showTermsDialog = true }
                                         )
                                     }
-                                },
-                                visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Password,
-                                    imeAction = ImeAction.Next
-                                ),
-                                onFocusChanged = { password.onFocusChanged(it) }
-                            )
-
-                            // Live password checklist - ticks as each condition is satisfied
-                            PasswordRequirementsList(
-                                rules = passwordRules,
-                                showFailures = password.touched
-                            )
-
-                            // Confirm Password Input
-                            AuthTextField(
-                                value = confirmPassword.text,
-                                onValueChange = { input ->
-                                    confirmPassword.text = input
-                                        .filter { !it.isWhitespace() }
-                                        .take(AuthValidator.MAX_PASSWORD_LENGTH)
-                                },
-                                label = "Confirm Password",
-                                leadingIcon = Icons.Default.LockReset,
-                                errorText = visibleConfirmError,
-                                visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Password,
-                                    imeAction = ImeAction.Done
-                                ),
-                                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                                onFocusChanged = { confirmPassword.onFocusChanged(it) }
-                            )
-
-                            // Terms Checkbox & Clickable Label
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = termsAccepted,
-                                    onCheckedChange = { termsAccepted = it },
-                                    colors = CheckboxDefaults.colors(
-                                        checkedColor = OrangePrimary,
-                                        uncheckedColor = Color.White.copy(alpha = 0.5f)
-                                    )
-                                )
-                                Row {
-                                    Text(
-                                        text = "I agree to ",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color.White.copy(alpha = 0.8f)
-                                    )
-                                    Text(
-                                        text = "Terms & Privacy Policy",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = OrangeSecondary,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.clickable { showTermsDialog = true }
-                                    )
                                 }
-                            }
 
-                            // Sign Up Button (disabled until all fields are filled)
-                            Button(
-                                onClick = { submit() },
-                                enabled = canSubmit,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(52.dp),
-                                shape = RoundedCornerShape(26.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = OrangePrimary,
-                                    contentColor = Color.White,
-                                    disabledContainerColor = Color.White.copy(alpha = 0.12f),
-                                    disabledContentColor = Color.White.copy(alpha = 0.4f)
-                                )
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        "Create Account",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
+                                // Sign Up Button
+                                Button(
+                                    onClick = { submit() },
+                                    enabled = canSubmit,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(52.dp),
+                                    shape = RoundedCornerShape(26.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = OrangePrimary,
+                                        contentColor = Color.White,
+                                        disabledContainerColor = Color.White.copy(alpha = 0.12f),
+                                        disabledContentColor = Color.White.copy(alpha = 0.4f)
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.ArrowForward,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            "Create Account",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.ArrowForward,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                // Switch to Sign In
-                item {
-                    Spacer(modifier = Modifier.height(28.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Already have an account? ", color = Color.White.copy(alpha = 0.7f))
-                        Text(
-                            text = "Sign In",
-                            color = OrangeSecondary,
-                            fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.clickable(onClick = onNavigateToSignIn)
-                        )
+                    // Switch to Sign In
+                    item {
+                        Spacer(modifier = Modifier.height(28.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Already have an account? ", color = Color.White.copy(alpha = 0.7f))
+                            Text(
+                                text = "Sign In",
+                                color = OrangeSecondary,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.clickable(onClick = onNavigateToSignIn)
+                            )
+                        }
                     }
                 }
             }
