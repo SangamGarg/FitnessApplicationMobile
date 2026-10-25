@@ -171,6 +171,8 @@ fun ExerciseCameraScreen(
     detector: ExerciseDetector,
     config: ExerciseCameraConfig,
     onBack: () -> Unit,
+    onExerciseStateChanged: (ExerciseState) -> Unit = {},
+    overlayContent: @Composable (ExerciseState) -> Unit = {},
 ) {
     val context = LocalContext.current
     val rulesPreferences = remember(context, config.exerciseId) {
@@ -198,16 +200,24 @@ fun ExerciseCameraScreen(
     }
 
     ExerciseCameraContent(
-        detector = detector, config = config, onBack = onBack
+        detector = detector,
+        config = config,
+        onBack = onBack,
+        onExerciseStateChanged = onExerciseStateChanged,
+        overlayContent = overlayContent
     )
+
 }
 
 @OptIn(ExperimentalGetImage::class)
+
 @Composable
 private fun ExerciseCameraContent(
     detector: ExerciseDetector,
     config: ExerciseCameraConfig,
     onBack: () -> Unit,
+    onExerciseStateChanged: (ExerciseState) -> Unit = {},
+    overlayContent: @Composable (ExerciseState) -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -347,11 +357,14 @@ private fun ExerciseCameraContent(
                         val nowMs = SystemClock.uptimeMillis()
                         if (pose == null) {
                             livenessState = livenessEvaluator.onPoseLost()
-                            exerciseState = detector.onPoseLost()
+                            val lostState = detector.onPoseLost()
+                            exerciseState = lostState
+                            onExerciseStateChanged(lostState)
                             poseStatus = NO_PERSON_WARNING
                         } else if (livenessState.status == LivenessStatus.VERIFIED && livenessState.canCountRepetitions) {
                             val updatedState = detector.processPose(pose)
                             exerciseState = updatedState
+                            onExerciseStateChanged(updatedState)
                             poseStatus = when {
                                 !updatedState.isPoseReliable -> config.poseWarning
                                 else -> updatedState.feedback
@@ -516,31 +529,22 @@ private fun ExerciseCameraContent(
         // Verification Glass Overlay Card
         if (!isVerified) {
             Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 24.dp)
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp)
+                    .fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color(0xEE1A1A26),
-                                Color(0xEE12121B)
+                                Color(0xEE1A1A26), Color(0xEE12121B)
                             )
                         )
-                    )
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.linearGradient(
+                    ).border(
+                        width = 1.dp, brush = Brush.linearGradient(
                             colors = listOf(
                                 Color.White.copy(alpha = 0.35f),
                                 OrangePrimary.copy(alpha = 0.3f),
                                 Color.White.copy(alpha = 0.08f)
                             )
-                        ),
-                        shape = RoundedCornerShape(24.dp)
-                    )
-                    .padding(22.dp),
+                        ), shape = RoundedCornerShape(24.dp)
+                    ).padding(22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
@@ -586,9 +590,7 @@ private fun ExerciseCameraContent(
                             livenessState = livenessEvaluator.state
                             poseStatus = livenessState.instruction
                             warningMessage = null
-                        },
-                        shape = RoundedCornerShape(20.dp),
-                        colors = ButtonDefaults.buttonColors(
+                        }, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(
                             containerColor = config.accentColor, // Green Revalidate
                             contentColor = Color(0xFF101820)
                         )
@@ -608,42 +610,34 @@ private fun ExerciseCameraContent(
         // Verification Success Toast
         if (verificationSuccessMessage) {
             Row(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 24.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp)
+                    .clip(RoundedCornerShape(20.dp)).background(
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color(0xEE1A1A26),
-                                Color(0xEE12121B)
+                                Color(0xEE1A1A26), Color(0xEE12121B)
                             )
                         )
-                    )
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.linearGradient(
+                    ).border(
+                        width = 1.dp, brush = Brush.linearGradient(
                             colors = listOf(
                                 Color.White.copy(alpha = 0.35f),
                                 config.accentColor.copy(alpha = 0.5f),
                                 Color.White.copy(alpha = 0.08f)
                             )
-                        ),
-                        shape = RoundedCornerShape(20.dp)
-                    )
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                        ), shape = RoundedCornerShape(20.dp)
+                    ).padding(horizontal = 20.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(config.accentColor),
-                    contentAlignment = Alignment.Center
+                    modifier = Modifier.size(36.dp).clip(CircleShape)
+                        .background(config.accentColor), contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "✓", color = Color(0xFF101820), fontSize = 20.sp, fontWeight = FontWeight.Bold
+                        "✓",
+                        color = Color(0xFF101820),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -661,42 +655,34 @@ private fun ExerciseCameraContent(
         // Reset Toast
         if (resetMessage) {
             Row(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 100.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 100.dp)
+                    .clip(RoundedCornerShape(20.dp)).background(
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color(0xEE1A1A26),
-                                Color(0xEE12121B)
+                                Color(0xEE1A1A26), Color(0xEE12121B)
                             )
                         )
-                    )
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.linearGradient(
+                    ).border(
+                        width = 1.dp, brush = Brush.linearGradient(
                             colors = listOf(
                                 Color.White.copy(alpha = 0.35f),
                                 config.accentColor.copy(alpha = 0.5f),
                                 Color.White.copy(alpha = 0.08f)
                             )
-                        ),
-                        shape = RoundedCornerShape(20.dp)
-                    )
-                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                        ), shape = RoundedCornerShape(20.dp)
+                    ).padding(horizontal = 18.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(config.accentColor),
-                    contentAlignment = Alignment.Center
+                    modifier = Modifier.size(28.dp).clip(CircleShape)
+                        .background(config.accentColor), contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "✓", color = Color(0xFF101820), fontSize = 16.sp, fontWeight = FontWeight.Bold
+                        "✓",
+                        color = Color(0xFF101820),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
                 Text(
@@ -711,30 +697,23 @@ private fun ExerciseCameraContent(
         // Warning Toast
         warningMessage?.let { message ->
             Row(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
+                modifier = Modifier.align(Alignment.TopStart)
                     .padding(top = 16.dp, start = 16.dp, end = 120.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
+                    .clip(RoundedCornerShape(20.dp)).background(
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color(0xEE1A1A26),
-                                Color(0xEE12121B)
+                                Color(0xEE1A1A26), Color(0xEE12121B)
                             )
                         )
-                    )
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.linearGradient(
+                    ).border(
+                        width = 1.dp, brush = Brush.linearGradient(
                             colors = listOf(
                                 Color.White.copy(alpha = 0.35f),
                                 config.warningColor.copy(alpha = 0.5f),
                                 Color.White.copy(alpha = 0.08f)
                             )
-                        ),
-                        shape = RoundedCornerShape(20.dp)
-                    )
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                        ), shape = RoundedCornerShape(20.dp)
+                    ).padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -745,33 +724,30 @@ private fun ExerciseCameraContent(
 
         // Reps Counter Badge (Top Right)
         Column(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-                .clip(RoundedCornerShape(22.dp))
-                .background(
+            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
+                .clip(RoundedCornerShape(22.dp)).background(
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            Color(0xEE1A1A26),
-                            Color(0xEE12121B)
+                            Color(0xEE1A1A26), Color(0xEE12121B)
                         )
                     )
-                )
-                .border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
+                ).border(
+                    width = 1.dp, brush = Brush.linearGradient(
                         colors = listOf(
                             Color.White.copy(alpha = 0.35f),
                             OrangePrimary.copy(alpha = 0.3f),
                             Color.White.copy(alpha = 0.08f)
                         )
-                    ),
-                    shape = RoundedCornerShape(22.dp)
-                )
-                .padding(horizontal = 22.dp, vertical = 12.dp),
+                    ), shape = RoundedCornerShape(22.dp)
+                ).padding(horizontal = 22.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("REPS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = OrangeSecondary)
+            Text(
+                "REPS",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = OrangeSecondary
+            )
             Text(
                 exerciseState.repetitions.toString(),
                 style = MaterialTheme.typography.headlineLarge,
@@ -798,32 +774,23 @@ private fun ExerciseCameraContent(
         // HUD / Options Glass Panel (Bottom Center)
         if (isVerified && isHudVisible) {
             Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
-                    .clip(RoundedCornerShape(24.dp))
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp).clip(RoundedCornerShape(24.dp))
                     .background(
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color(0xEE1A1A26),
-                                Color(0xEE12121B)
+                                Color(0xEE1A1A26), Color(0xEE12121B)
                             )
                         )
-                    )
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.linearGradient(
+                    ).border(
+                        width = 1.dp, brush = Brush.linearGradient(
                             colors = listOf(
                                 Color.White.copy(alpha = 0.35f),
                                 OrangePrimary.copy(alpha = 0.3f),
                                 Color.White.copy(alpha = 0.08f)
                             )
-                        ),
-                        shape = RoundedCornerShape(24.dp)
-                    )
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ), shape = RoundedCornerShape(24.dp)
+                    ).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
                     text = if (poseStatus == NO_PERSON_WARNING || poseStatus == config.poseWarning) poseStatus else exerciseState.feedback,
@@ -841,12 +808,10 @@ private fun ExerciseCameraContent(
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.7f)
                     )
-                    Text(
-                        exerciseState.primaryAngleDegrees?.let { "${it.toInt()}°" } ?: "--",
+                    Text(exerciseState.primaryAngleDegrees?.let { "${it.toInt()}°" } ?: "--",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
-                    )
+                        color = Color.White)
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -886,7 +851,8 @@ private fun ExerciseCameraContent(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.15f), contentColor = Color.White
+                            containerColor = Color.White.copy(alpha = 0.15f),
+                            contentColor = Color.White
                         )
                     ) { Text("Back", fontWeight = FontWeight.Bold) }
                 }
@@ -899,9 +865,15 @@ private fun ExerciseCameraContent(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.15f), contentColor = Color.White
+                            containerColor = Color.White.copy(alpha = 0.15f),
+                            contentColor = Color.White
                         )
-                    ) { Text(if (isSkeletonVisible) "Hide Skeleton" else "Show Skeleton", fontWeight = FontWeight.Bold) }
+                    ) {
+                        Text(
+                            if (isSkeletonVisible) "Hide Skeleton" else "Show Skeleton",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                     Button(
                         onClick = {
                             exerciseState = detector.reset()
@@ -914,7 +886,8 @@ private fun ExerciseCameraContent(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.15f), contentColor = Color.White
+                            containerColor = Color.White.copy(alpha = 0.15f),
+                            contentColor = Color.White
                         )
                     ) { Text("Reset", fontWeight = FontWeight.Bold) }
                 }
@@ -927,8 +900,12 @@ private fun ExerciseCameraContent(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = OrangePrimary, contentColor = Color.White
                 )
-            ) { Text("Show Options", fontWeight = FontWeight.Bold) }
+            ) {
+                Text("Show Options", fontWeight = FontWeight.Bold)
+            }
         }
+        // Boss battle UI renders over the camera preview.
+        overlayContent(exerciseState)
     }
 }
 

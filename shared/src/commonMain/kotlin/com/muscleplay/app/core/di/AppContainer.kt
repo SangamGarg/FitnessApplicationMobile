@@ -1,6 +1,8 @@
 package com.muscleplay.app.core.di
 
 import com.muscleplay.app.core.network.ApiClient
+import com.muscleplay.app.feature.diet.data.InMemoryMealDao
+import com.muscleplay.app.feature.diet.data.MealDao
 import com.muscleplay.app.feature.workout.InMemoryWorkoutRepository
 import com.muscleplay.app.feature.workout.WorkoutRepository
 
@@ -10,4 +12,6 @@ class AppContainer {
         InMemoryWorkoutRepository()
 
     val apiClient: ApiClient = ApiClient()
+
+    val mealDao: MealDao = InMemoryMealDao()
 }

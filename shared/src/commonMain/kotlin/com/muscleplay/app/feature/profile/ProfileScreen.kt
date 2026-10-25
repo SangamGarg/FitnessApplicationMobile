@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,6 +31,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -49,6 +51,8 @@ data class ProgressPhoto(
     val subtitle: String,
 )
 
+
+
 val sampleProgressPhotos = listOf(
     ProgressPhoto("1", "Day 1 - Starting Out", "Oct 1, 2024", "Initial assessment & baseline"),
     ProgressPhoto("2", "Day 15 - Building Habit", "Oct 15, 2024", "Consistent routine established"),
@@ -58,6 +62,45 @@ val sampleProgressPhotos = listOf(
     ProgressPhoto("6", "Day 75 - Definition Boost", "Dec 15, 2024", "Lower body strength gains"),
     ProgressPhoto("7", "Day 90 - Peak Fitness", "Jan 1, 2025", "Transformation milestone achieved"),
     ProgressPhoto("8", "Day 100 - Master Level", "Jan 10, 2025", "Ready for advanced workouts")
+)
+
+data class SocialHandleItem(
+    val name: String,
+    val handle: String,
+    val icon: ImageVector,
+    val iconColor: Color,
+    val url: String
+)
+
+val socialHandlesList = listOf(
+    SocialHandleItem(
+        name = "Instagram",
+        handle = "@MusclePlayApp",
+        icon = Icons.Default.PhotoCamera,
+        iconColor = Color(0xFFE1306C),
+        url = "https://instagram.com/MusclePlayApp"
+    ),
+    SocialHandleItem(
+        name = "YouTube",
+        handle = "MusclePlay Official",
+        icon = Icons.Default.PlayCircle,
+        iconColor = Color(0xFFFF0000),
+        url = "https://youtube.com/@MusclePlayOfficial"
+    ),
+    SocialHandleItem(
+        name = "X (Twitter)",
+        handle = "@MusclePlay",
+        icon = Icons.Default.AlternateEmail,
+        iconColor = Color(0xFF1DA1F2),
+        url = "https://x.com/MusclePlay"
+    ),
+    SocialHandleItem(
+        name = "Discord Community",
+        handle = "discord.gg/muscleplay",
+        icon = Icons.Default.Forum,
+        iconColor = Color(0xFF5865F2),
+        url = "https://discord.gg/muscleplay"
+    )
 )
 
 @Composable
@@ -165,7 +208,22 @@ fun ProfileScreen(
 
         Scaffold(
             containerColor = Color.Transparent,
-            snackbarHost = { SnackbarHost(snackbarHostState) }
+            snackbarHost = {
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier.padding(bottom = 88.dp, start = 16.dp, end = 16.dp)
+                ) { data ->
+                    Snackbar(
+                        snackbarData = data,
+                        shape = RoundedCornerShape(16.dp),
+                        containerColor = Color(0xFF181824),
+                        contentColor = Color.White,
+                        actionColor = OrangeSecondary,
+                        dismissActionContentColor = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.border(1.dp, OrangePrimary.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                    )
+                }
+            }
         ) { innerPadding ->
             Column(
                 modifier = Modifier
@@ -292,8 +350,23 @@ fun ProfileScreen(
             if (showLogoutDialog) {
                 AlertDialog(
                     onDismissRequest = { showLogoutDialog = false },
-                    title = { Text("Logout") },
-                    text = { Text("Are you sure you want to log out of MusclePlay?") },
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = Color(0xFF181824),
+                    title = {
+                        Text(
+                            text = "Logout",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = "Are you sure you want to log out of MusclePlay?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
+                    },
                     confirmButton = {
                         TextButton(
                             onClick = {
@@ -302,12 +375,12 @@ fun ProfileScreen(
                                 snackbarMessage = "Logged out successfully"
                             }
                         ) {
-                            Text("Logout", color = Color(0xFFFF5252))
+                            Text("Logout", color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { showLogoutDialog = false }) {
-                            Text("Cancel")
+                            Text("Cancel", color = Color.White.copy(alpha = 0.6f))
                         }
                     }
                 )
@@ -326,60 +399,205 @@ fun ProfileScreen(
             if (showRateDialog) {
                 AlertDialog(
                     onDismissRequest = { showRateDialog = false },
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = Color(0xFF181824),
                     icon = {
-                        Icon(
-                            Icons.Default.Star,
-                            contentDescription = null,
-                            tint = OrangeSecondary
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(OrangePrimary.copy(alpha = 0.2f))
+                                .border(1.dp, OrangePrimary.copy(alpha = 0.5f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = "Rate Us",
+                                tint = OrangeSecondary,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    },
+                    title = {
+                        Text(
+                            text = "Rate MusclePlay ⭐️",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
                         )
                     },
-                    title = { Text("Rate MusclePlay") },
-                    text = { Text("Enjoying MusclePlay? Please take a moment to rate us 5 stars on the Play Store and help us grow!") },
+                    text = {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "Enjoying MusclePlay? Please take a moment to rate us 5 stars on the Play Store and help us grow!",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.85f)
+                            )
+
+                            // 5 Star Rating Preview Row
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                repeat(5) {
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = OrangeSecondary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                        }
+                    },
                     confirmButton = {
                         Button(
                             onClick = {
                                 showRateDialog = false
                                 snackbarMessage = "Redirecting to Play Store..."
                             },
+                            shape = RoundedCornerShape(20.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
                         ) {
-                            Text("Rate Now")
+                            Text("Rate Now 🔥", fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { showRateDialog = false }) {
-                            Text("Later")
+                            Text("Later", color = Color.White.copy(alpha = 0.6f))
                         }
                     }
                 )
             }
 
             if (showFollowDialog) {
+                val uriHandler = LocalUriHandler.current
+
                 AlertDialog(
                     onDismissRequest = { showFollowDialog = false },
-                    title = { Text("Follow Us On") },
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Stay updated with workout challenges and fitness tips:")
-                            Text("• Instagram: @MusclePlayApp", color = OrangeSecondary)
-                            Text("• YouTube: MusclePlay Official", color = OrangeSecondary)
-                            Text("• X (Twitter): @MusclePlay", color = OrangeSecondary)
-                            Text(
-                                "• Community Discord: discord.gg/muscleplay",
-                                color = OrangeSecondary
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = Color(0xFF181824),
+                    icon = {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(OrangePrimary.copy(alpha = 0.2f))
+                                .border(1.dp, OrangePrimary.copy(alpha = 0.5f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Public,
+                                contentDescription = "Community",
+                                tint = OrangeSecondary,
+                                modifier = Modifier.size(32.dp)
                             )
+                        }
+                    },
+                    title = {
+                        Text(
+                            text = "Follow Us On 🌐",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = "Stay updated with workout challenges, tips & community events:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.85f)
+                            )
+
+                            socialHandlesList.forEach { item ->
+                                SocialHandleRowItem(
+                                    item = item,
+                                    onClick = {
+                                        showFollowDialog = false
+                                        uriHandler.openUri(item.url)
+                                    }
+                                )
+                            }
                         }
                     },
                     confirmButton = {
                         Button(
                             onClick = { showFollowDialog = false },
+                            shape = RoundedCornerShape(20.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
                         ) {
-                            Text("Close")
+                            Text("Close", fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SocialHandleRowItem(
+    item: SocialHandleItem,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White.copy(alpha = 0.06f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(item.iconColor.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = item.name,
+                        tint = item.iconColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Column {
+                    Text(
+                        text = item.name,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = item.handle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OrangeSecondary
+                    )
+                }
+            }
+
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                contentDescription = "Open Link",
+                tint = Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }

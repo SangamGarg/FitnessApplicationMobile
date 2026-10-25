@@ -38,6 +38,8 @@ import com.muscleplay.app.feature.auth.OtpVerificationScreen
 import com.muscleplay.app.feature.auth.SignInScreen
 import com.muscleplay.app.feature.auth.SignUpScreen
 import com.muscleplay.app.feature.calculators.CalculatorsScreen
+import com.muscleplay.app.feature.diet.DietHomeScreen
+import com.muscleplay.app.feature.diet.IngredientScannerScreen
 import com.muscleplay.app.feature.games.GamesScreen
 import com.muscleplay.app.feature.games.RepChallengeScreen
 import com.muscleplay.app.feature.games.pushup.PushUpCameraScreen
@@ -65,6 +67,9 @@ private object Routes {
     const val SIGN_IN = "sign_in"
     const val SIGN_UP = "sign_up"
     const val OTP_VERIFICATION = "otp_verification"
+
+    const val DIET_HOME = "diet_home"
+    const val INGREDIENT_SCANNER = "ingredient_scanner"
 
     const val SQUAT_MASTER_ROUTE = "squat_master"
     const val REP_CHALLENGE_ROUTE = "rep_challenge"
@@ -123,6 +128,7 @@ fun MusclePlayNavigation(
         Routes.SIGN_IN,
         Routes.SIGN_UP,
         Routes.OTP_VERIFICATION,
+        Routes.INGREDIENT_SCANNER,
         Routes.SQUAT_MASTER_ROUTE,
         Routes.REP_CHALLENGE_ROUTE,
         Routes.PUSH_UP_MASTER_ROUTE,
@@ -133,7 +139,8 @@ fun MusclePlayNavigation(
         Routes.PROFILE_RAISE_TICKET,
         Routes.PROFILE_MY_TICKETS
     )
-    val shouldHideBottomBar = currentRoute in bottomBarHiddenRoutes || currentRoute?.startsWith(Routes.OTP_VERIFICATION) == true
+    val shouldHideBottomBar =
+        currentRoute in bottomBarHiddenRoutes || currentRoute?.startsWith(Routes.OTP_VERIFICATION) == true
 
     val selectedIndex = remember(currentDestination) {
         val activeRoute = tabs.firstOrNull { tab ->
@@ -166,14 +173,15 @@ fun MusclePlayNavigation(
         label = "animatedCenterX"
     )
 
-    val bumpShape = remember(animatedCenterX, barWidthPx, bumpWidthPx, bumpHeightPx, cornerRadiusPx) {
-        BumpBarShape(
-            selectedCenterXPx = animatedCenterX,
-            bumpWidthPx = bumpWidthPx,
-            bumpHeightPx = bumpHeightPx,
-            cornerRadiusPx = cornerRadiusPx
-        )
-    }
+    val bumpShape =
+        remember(animatedCenterX, barWidthPx, bumpWidthPx, bumpHeightPx, cornerRadiusPx) {
+            BumpBarShape(
+                selectedCenterXPx = animatedCenterX,
+                bumpWidthPx = bumpWidthPx,
+                bumpHeightPx = bumpHeightPx,
+                cornerRadiusPx = cornerRadiusPx
+            )
+        }
 
     Box(
         modifier = Modifier
@@ -192,7 +200,9 @@ fun MusclePlayNavigation(
                 SplashScreen(
                     onSplashFinished = {
                         val destination = if (onboardingPreferences.isOnboardingCompleted()) {
-                            Routes.SIGN_IN
+                            //TODO
+                            //    Routes.SIGN_IN
+                            Routes.HOME
                         } else {
                             Routes.ONBOARDING
                         }
@@ -241,7 +251,8 @@ fun MusclePlayNavigation(
                 )
             }
             composable("${Routes.OTP_VERIFICATION}/{email}") { backStackEntry ->
-                val userEmail = backStackEntry.savedStateHandle.get<String>("email") ?: "user@muscleplay.com"
+                val userEmail =
+                    backStackEntry.savedStateHandle.get<String>("email") ?: "user@muscleplay.com"
                 OtpVerificationScreen(
                     userEmail = userEmail,
                     onOtpVerified = {
@@ -257,7 +268,26 @@ fun MusclePlayNavigation(
                 )
             }
             composable(Routes.HOME) {
-                HomeScreen()
+                HomeScreen(
+                    onNavigateToDiet = { navController.navigate(Routes.DIET_HOME) },
+                    onNavigateToWorkouts = { navController.navigate(Routes.WORKOUTS) },
+                    onNavigateToGames = { navController.navigate(Routes.GAMES) },
+                    onNavigateToCalculators = { navController.navigate(Routes.CALCULATORS) },
+                    onNavigateToProfile = { navController.navigate(Routes.PROFILE) }
+                )
+            }
+            composable(Routes.DIET_HOME) {
+                DietHomeScreen(
+                    mealDao = appContainer.mealDao,
+                    onNavigateToScanner = { navController.navigate(Routes.INGREDIENT_SCANNER) },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Routes.INGREDIENT_SCANNER) {
+                IngredientScannerScreen(
+                    mealDao = appContainer.mealDao,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(Routes.WORKOUTS) {
                 WorkoutScreen(

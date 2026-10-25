@@ -36,7 +36,13 @@ private val OrangeGlow = Color(0xFFFF3D00) // Glowing Deep Orange
 private val DarkBackground = Color(0xFF0F0F17) // Deep Obsidian Midnight
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    onNavigateToDiet: () -> Unit = {},
+    onNavigateToWorkouts: () -> Unit = {},
+    onNavigateToGames: () -> Unit = {},
+    onNavigateToCalculators: () -> Unit = {},
+    onNavigateToProfile: () -> Unit = {}
+) {
     // Ambient glowing pulse animation
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
@@ -102,7 +108,9 @@ fun HomeScreen() {
         ) {
             // Header Section
             item {
-                GlassHeaderSection()
+                GlassHeaderSection(
+                    onNavigateToProfile = onNavigateToProfile
+                )
             }
 
             // Daily Activity Rings Card
@@ -112,7 +120,9 @@ fun HomeScreen() {
 
             // Featured Workout Card
             item {
-                GlassFeaturedWorkoutCard()
+                GlassFeaturedWorkoutCard(
+                    onStartWorkout = onNavigateToWorkouts
+                )
             }
 
             // Explore Quick Actions Grid
@@ -127,25 +137,52 @@ fun HomeScreen() {
             }
 
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    GlassQuickActionCard(
-                        title = "Fitness Games",
-                        subtitle = "Camera Rep Challenges",
-                        icon = Icons.Default.Gamepad,
-                        gradientColors = listOf(OrangePrimary, OrangeSecondary),
-                        modifier = Modifier.weight(1f)
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        GlassQuickActionCard(
+                            title = "Diet & AI Chef",
+                            subtitle = "Smart Recipes & Scan",
+                            icon = Icons.Default.RestaurantMenu,
+                            gradientColors = listOf(OrangePrimary, OrangeGlow),
+                            modifier = Modifier.weight(1f),
+                            onClick = onNavigateToDiet
+                        )
 
-                    GlassQuickActionCard(
-                        title = "Calculators",
-                        subtitle = "BMI, BMR & Calorie",
-                        icon = Icons.Default.Calculate,
-                        gradientColors = listOf(OrangeSecondary, Color(0xFFFFC107)),
-                        modifier = Modifier.weight(1f)
-                    )
+                        GlassQuickActionCard(
+                            title = "Fitness Games",
+                            subtitle = "Camera Rep Challenges",
+                            icon = Icons.Default.Gamepad,
+                            gradientColors = listOf(OrangePrimary, OrangeSecondary),
+                            modifier = Modifier.weight(1f),
+                            onClick = onNavigateToGames
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        GlassQuickActionCard(
+                            title = "Workouts",
+                            subtitle = "AI Pose & Exercises",
+                            icon = Icons.Default.FitnessCenter,
+                            gradientColors = listOf(OrangeGlow, OrangePrimary),
+                            modifier = Modifier.weight(1f),
+                            onClick = onNavigateToWorkouts
+                        )
+
+                        GlassQuickActionCard(
+                            title = "Calculators",
+                            subtitle = "BMI, BMR & Calorie",
+                            icon = Icons.Default.Calculate,
+                            gradientColors = listOf(OrangeSecondary, Color(0xFFFFC107)),
+                            modifier = Modifier.weight(1f),
+                            onClick = onNavigateToCalculators
+                        )
+                    }
                 }
             }
 
@@ -158,7 +195,9 @@ fun HomeScreen() {
 }
 
 @Composable
-private fun GlassHeaderSection() {
+private fun GlassHeaderSection(
+    onNavigateToProfile: () -> Unit = {}
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -212,6 +251,7 @@ private fun GlassHeaderSection() {
             modifier = Modifier
                 .size(60.dp)
                 .clip(CircleShape)
+                .clickable(onClick = onNavigateToProfile)
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -405,7 +445,9 @@ private fun ActivityStatRow(
 }
 
 @Composable
-private fun GlassFeaturedWorkoutCard() {
+private fun GlassFeaturedWorkoutCard(
+    onStartWorkout: () -> Unit = {}
+) {
     GlassContainer(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp)
@@ -463,7 +505,7 @@ private fun GlassFeaturedWorkoutCard() {
                 )
 
                 Button(
-                    onClick = { /* TODO */ },
+                    onClick = onStartWorkout,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp),
@@ -502,10 +544,11 @@ private fun GlassQuickActionCard(
     subtitle: String,
     icon: ImageVector,
     gradientColors: List<Color>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
 ) {
     GlassContainer(
-        modifier = modifier.clickable { /* TODO */ },
+        modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(24.dp)
     ) {
         Column(
