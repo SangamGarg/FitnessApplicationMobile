@@ -1,4 +1,4 @@
-package com.muscleplay.app.feature.profile
+package com.muscleplay.app.feature.profile.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,7 +24,6 @@ private val OrangePrimary = Color(0xFFFF5722)
 private val OrangeSecondary = Color(0xFFFF9800)
 private val DarkBackground = Color(0xFF0F0F17)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit

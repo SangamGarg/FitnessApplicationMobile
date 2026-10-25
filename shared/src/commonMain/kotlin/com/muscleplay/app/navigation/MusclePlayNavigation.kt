@@ -38,6 +38,7 @@ import com.muscleplay.app.feature.auth.OtpVerificationScreen
 import com.muscleplay.app.feature.auth.SignInScreen
 import com.muscleplay.app.feature.auth.SignUpScreen
 import com.muscleplay.app.feature.calculators.CalculatorsScreen
+import com.muscleplay.app.feature.coins.MpCoinsHubScreen
 import com.muscleplay.app.feature.diet.DietHomeScreen
 import com.muscleplay.app.feature.diet.IngredientScannerScreen
 import com.muscleplay.app.feature.games.GamesScreen
@@ -47,13 +48,15 @@ import com.muscleplay.app.feature.games.squat.SquatCameraScreen
 import com.muscleplay.app.feature.home.HomeScreen
 import com.muscleplay.app.feature.onboarding.OnboardingScreen
 import com.muscleplay.app.feature.onboarding.rememberOnboardingPreferences
-import com.muscleplay.app.feature.profile.FullPhotoGalleryScreen
-import com.muscleplay.app.feature.profile.HelpSupportScreen
-import com.muscleplay.app.feature.profile.MyTicketsScreen
 import com.muscleplay.app.feature.profile.ProfileScreen
-import com.muscleplay.app.feature.profile.RaiseTicketScreen
-import com.muscleplay.app.feature.profile.SelfDiagnosticsScreen
-import com.muscleplay.app.feature.profile.SettingsScreen
+import com.muscleplay.app.feature.profile.diagnostics.SelfDiagnosticsScreen
+import com.muscleplay.app.feature.profile.gallery.FullPhotoGalleryScreen
+import com.muscleplay.app.feature.profile.settings.SettingsScreen
+import com.muscleplay.app.feature.profile.support.AiBotSupportScreen
+import com.muscleplay.app.feature.profile.support.EmailSupportScreen
+import com.muscleplay.app.feature.profile.support.HelpSupportScreen
+import com.muscleplay.app.feature.profile.support.MyTicketsScreen
+import com.muscleplay.app.feature.profile.support.RaiseTicketScreen
 import com.muscleplay.app.feature.splash.SplashScreen
 import com.muscleplay.app.feature.workout.WorkoutScreen
 
@@ -81,6 +84,9 @@ private object Routes {
     const val PROFILE_SETTINGS = "profile_settings"
     const val PROFILE_RAISE_TICKET = "profile_raise_ticket"
     const val PROFILE_MY_TICKETS = "profile_my_tickets"
+    const val PROFILE_COIN_REDEMPTION = "profile_coin_redemption"
+    const val PROFILE_EMAIL_SUPPORT = "profile_email_support"
+    const val PROFILE_AI_BOT = "profile_ai_bot"
 
     const val HOME = "home"
     const val WORKOUTS = "workouts"
@@ -137,7 +143,10 @@ fun MusclePlayNavigation(
         Routes.PROFILE_HELP,
         Routes.PROFILE_SETTINGS,
         Routes.PROFILE_RAISE_TICKET,
-        Routes.PROFILE_MY_TICKETS
+        Routes.PROFILE_MY_TICKETS,
+        Routes.PROFILE_COIN_REDEMPTION,
+        Routes.PROFILE_EMAIL_SUPPORT,
+        Routes.PROFILE_AI_BOT
     )
     val shouldHideBottomBar =
         currentRoute in bottomBarHiddenRoutes || currentRoute?.startsWith(Routes.OTP_VERIFICATION) == true
@@ -200,9 +209,10 @@ fun MusclePlayNavigation(
                 SplashScreen(
                     onSplashFinished = {
                         val destination = if (onboardingPreferences.isOnboardingCompleted()) {
+                            Routes.SIGN_IN
+
                             //TODO
-                            //    Routes.SIGN_IN
-                            Routes.HOME
+                            //    Routes.HOME
                         } else {
                             Routes.ONBOARDING
                         }
@@ -324,7 +334,15 @@ fun MusclePlayNavigation(
                     onNavigateToSettings = { navController.navigate(Routes.PROFILE_SETTINGS) },
                     onNavigateToHelp = { navController.navigate(Routes.PROFILE_HELP) },
                     onNavigateToDiagnostics = { navController.navigate(Routes.PROFILE_DIAGNOSTICS) },
-                    onNavigateToGallery = { navController.navigate(Routes.PROFILE_GALLERY) }
+                    onNavigateToGallery = { navController.navigate(Routes.PROFILE_GALLERY) },
+                    onNavigateToCoinRedemption = { navController.navigate(Routes.PROFILE_COIN_REDEMPTION) }
+                )
+            }
+            composable(Routes.PROFILE_COIN_REDEMPTION) {
+                MpCoinsHubScreen(
+                    onBack = {
+                        navController.popBackStack()
+                    }
                 )
             }
             composable(Routes.PROFILE_GALLERY) {
@@ -346,11 +364,34 @@ fun MusclePlayNavigation(
                     onBack = {
                         navController.popBackStack()
                     },
+                    onNavigateToAiBot = {
+                        navController.navigate(Routes.PROFILE_AI_BOT)
+                    },
+                    onNavigateToEmailSupport = {
+                        navController.navigate(Routes.PROFILE_EMAIL_SUPPORT)
+                    },
                     onNavigateToRaiseTicket = {
                         navController.navigate(Routes.PROFILE_RAISE_TICKET)
                     },
                     onNavigateToMyTickets = {
                         navController.navigate(Routes.PROFILE_MY_TICKETS)
+                    }
+                )
+            }
+            composable(Routes.PROFILE_EMAIL_SUPPORT) {
+                EmailSupportScreen(
+                    onBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+            composable(Routes.PROFILE_AI_BOT) {
+                AiBotSupportScreen(
+                    onBack = {
+                        navController.popBackStack()
+                    },
+                    onNavigateRoute = { route ->
+                        navController.navigate(route)
                     }
                 )
             }

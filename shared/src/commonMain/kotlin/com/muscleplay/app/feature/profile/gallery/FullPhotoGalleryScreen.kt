@@ -1,4 +1,4 @@
-package com.muscleplay.app.feature.profile
+package com.muscleplay.app.feature.profile.gallery
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,12 +21,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.muscleplay.app.feature.profile.ProgressPhoto
+import com.muscleplay.app.feature.profile.sampleProgressPhotos
 
 private val OrangePrimary = Color(0xFFFF5722)
 private val OrangeSecondary = Color(0xFFFF9800)
 private val DarkBackground = Color(0xFF0F0F17)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FullPhotoGalleryScreen(onBack: () -> Unit) {
     var selectedPhoto by remember { mutableStateOf<ProgressPhoto?>(null) }

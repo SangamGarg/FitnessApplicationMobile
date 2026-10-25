@@ -1,4 +1,4 @@
-package com.muscleplay.app.feature.profile
+package com.muscleplay.app.feature.profile.support
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -142,34 +142,68 @@ fun MyTicketsScreen(
                 }
             }
 
+            // Glassmorphic Ticket Details Dialog
             selectedTicket?.let { ticket ->
                 AlertDialog(
                     onDismissRequest = { selectedTicket = null },
-                    title = { Text("Ticket Details - ${ticket.id}") },
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = Color(0xFF181824),
+                    title = {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Ticket ${ticket.id}",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                            GlassStatusBadge(status = ticket.status)
+                        }
+                    },
                     text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(text = ticket.subject, fontWeight = FontWeight.Bold)
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Category: ${ticket.category}", style = MaterialTheme.typography.bodySmall, color = OrangeSecondary)
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Latest Support Update:", fontWeight = FontWeight.SemiBold)
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = Color.White.copy(alpha = 0.08f)
-                                )
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = ticket.subject,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Category: ${ticket.category} • Created: ${ticket.date}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = OrangeSecondary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Engineering Support Response:",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                            Surface(
+                                color = Color.White.copy(alpha = 0.08f),
+                                shape = RoundedCornerShape(16.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.3f)),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
                                     text = ticket.response,
-                                    modifier = Modifier.padding(12.dp),
-                                    style = MaterialTheme.typography.bodyMedium
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    modifier = Modifier.padding(14.dp)
                                 )
                             }
                         }
                     },
                     confirmButton = {
-                        Button(onClick = { selectedTicket = null }, colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)) {
-                            Text("Close")
+                        Button(
+                            onClick = { selectedTicket = null },
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                        ) {
+                            Text("Close", fontWeight = FontWeight.Bold)
                         }
                     }
                 )

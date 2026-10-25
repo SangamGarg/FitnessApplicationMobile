@@ -1,4 +1,4 @@
-package com.muscleplay.app.feature.profile
+package com.muscleplay.app.feature.profile.diagnostics
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

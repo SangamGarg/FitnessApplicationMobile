@@ -174,8 +174,7 @@ fun DietHomeScreen(
                         containerColor = Color(0xFF181824),
                         contentColor = Color.White,
                         actionColor = OrangeSecondary,
-                        dismissActionContentColor = Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.border(1.dp, OrangePrimary.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                        dismissActionContentColor = Color.White.copy(alpha = 0.7f)
                     )
                 }
             }

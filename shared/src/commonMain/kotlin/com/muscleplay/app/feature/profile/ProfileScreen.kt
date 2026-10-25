@@ -52,7 +52,6 @@ data class ProgressPhoto(
 )
 
 
-
 val sampleProgressPhotos = listOf(
     ProgressPhoto("1", "Day 1 - Starting Out", "Oct 1, 2024", "Initial assessment & baseline"),
     ProgressPhoto("2", "Day 15 - Building Habit", "Oct 15, 2024", "Consistent routine established"),
@@ -69,7 +68,7 @@ data class SocialHandleItem(
     val handle: String,
     val icon: ImageVector,
     val iconColor: Color,
-    val url: String
+    val url: String,
 )
 
 val socialHandlesList = listOf(
@@ -109,12 +108,13 @@ fun ProfileScreen(
     onNavigateToHelp: () -> Unit = {},
     onNavigateToDiagnostics: () -> Unit = {},
     onNavigateToGallery: () -> Unit = {},
+    onNavigateToCoinRedemption: () -> Unit = {},
     onLogout: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
 
     // Header sizes (expanded big card -> compact pinned card)
-    val expandedHeaderHeight = 260.dp
+    val expandedHeaderHeight = 300.dp
     val collapsedHeaderHeight = 76.dp
     val density = LocalDensity.current
     val collapseRangePx = with(density) {
@@ -219,8 +219,7 @@ fun ProfileScreen(
                         containerColor = Color(0xFF181824),
                         contentColor = Color.White,
                         actionColor = OrangeSecondary,
-                        dismissActionContentColor = Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.border(1.dp, OrangePrimary.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                        dismissActionContentColor = Color.White.copy(alpha = 0.7f)
                     )
                 }
             }
@@ -298,6 +297,12 @@ fun ProfileScreen(
                     // Options List
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            GlassProfileMenuItem(
+                                icon = Icons.Default.AccountBalanceWallet,
+                                title = "MP Coins",
+                                subtitle = "Buy, earn via invites, play games, cash out & view history",
+                                onClick = { onNavigateToCoinRedemption() }
+                            )
                             GlassProfileMenuItem(
                                 icon = Icons.Default.Settings,
                                 title = "Settings & Preferences",
@@ -542,7 +547,7 @@ fun ProfileScreen(
 @Composable
 private fun SocialHandleRowItem(
     item: SocialHandleItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Surface(
         onClick = onClick,
@@ -608,6 +613,7 @@ fun GlassCollapsibleProfileCard(
     userEmail: String,
     membershipStatus: String,
     streakDays: Int,
+    mpCoins: Int = 1250,
     collapseProgress: Float,
     expandedHeight: Dp,
     collapsedHeight: Dp,
@@ -677,14 +683,27 @@ fun GlassCollapsibleProfileCard(
                         color = Color.White.copy(alpha = 0.7f)
                     )
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        ProfileStatBadge(label = "Status", value = membershipStatus)
-                        ProfileStatBadge(label = "Streak", value = "$streakDays Days 🔥")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            ProfileStatBadge(label = "Status", value = membershipStatus)
+                            ProfileStatBadge(label = "Streak", value = "$streakDays Days 🔥")
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            ProfileStatBadge(label = "MP Coins", value = "$mpCoins MP 🪙")
+                        }
                     }
                 }
             } else {
@@ -759,7 +778,7 @@ fun GlassCollapsibleProfileCard(
                                 }
                             }
                             Text(
-                                text = "$userEmail • $streakDays Days 🔥",
+                                text = "$userEmail • $streakDays Days 🔥 • $mpCoins MP 🪙",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = OrangeSecondary,
                                 fontWeight = FontWeight.Bold,
@@ -983,13 +1002,34 @@ fun GlassFeedbackBottomSheet(
 
 @Composable
 fun ProfileStatBadge(label: String, value: String) {
+    val isCoins = label == "MP Coins"
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = OrangeSecondary
-        )
+        if (isCoins) {
+            Surface(
+                color = OrangeSecondary.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    OrangeSecondary.copy(alpha = 0.6f)
+                )
+            ) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = OrangeSecondary,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+            }
+        } else {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = OrangeSecondary
+            )
+        }
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
@@ -1049,6 +1089,7 @@ fun GlassProfileMenuItem(
     title: String,
     subtitle: String,
     tint: Color = OrangePrimary,
+    trailingBadge: String? = null,
     onClick: () -> Unit,
 ) {
     GlassContainer(
@@ -1092,6 +1133,26 @@ fun GlassProfileMenuItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.6f)
                 )
+            }
+
+            if (trailingBadge != null) {
+                Surface(
+                    color = OrangePrimary.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        OrangePrimary.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Text(
+                        text = trailingBadge,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = OrangeSecondary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
             }
 
             Icon(

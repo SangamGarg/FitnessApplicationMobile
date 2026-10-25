@@ -1,9 +1,11 @@
-package com.muscleplay.app.feature.profile
+package com.muscleplay.app.feature.profile.support
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -18,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.random.Random
 
 private val OrangePrimary = Color(0xFFFF5722)
@@ -121,7 +124,7 @@ fun RaiseTicketScreen(
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isCategoryExpanded) },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .menuAnchor(),
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true),
                             shape = RoundedCornerShape(16.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
@@ -132,11 +135,12 @@ fun RaiseTicketScreen(
                         )
                         ExposedDropdownMenu(
                             expanded = isCategoryExpanded,
-                            onDismissRequest = { isCategoryExpanded = false }
+                            onDismissRequest = { isCategoryExpanded = false },
+                            modifier = Modifier.background(Color(0xFF181824))
                         ) {
                             categories.forEach { cat ->
                                 DropdownMenuItem(
-                                    text = { Text(cat) },
+                                    text = { Text(cat, color = Color.White) },
                                     onClick = {
                                         selectedCategory = cat
                                         val subList = subCategoriesMap[cat] ?: listOf("Other Issue")
@@ -185,7 +189,7 @@ fun RaiseTicketScreen(
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isSubCategoryExpanded) },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .menuAnchor(),
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true),
                             shape = RoundedCornerShape(16.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
@@ -196,11 +200,12 @@ fun RaiseTicketScreen(
                         )
                         ExposedDropdownMenu(
                             expanded = isSubCategoryExpanded,
-                            onDismissRequest = { isSubCategoryExpanded = false }
+                            onDismissRequest = { isSubCategoryExpanded = false },
+                            modifier = Modifier.background(Color(0xFF181824))
                         ) {
                             currentSubList.forEach { subCat ->
                                 DropdownMenuItem(
-                                    text = { Text(subCat) },
+                                    text = { Text(subCat, color = Color.White) },
                                     onClick = {
                                         selectedSubCategory = subCat
                                         isSubCategoryExpanded = false
@@ -311,76 +316,123 @@ fun RaiseTicketScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
-                        shape = RoundedCornerShape(26.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = OrangePrimary,
+                            disabledContainerColor = Color.White.copy(alpha = 0.12f)
+                        )
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Submit Support Ticket", fontWeight = FontWeight.Bold, color = Color.White)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = Color.White)
+                            Text("Submit Support Ticket", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                        }
                     }
                 }
             }
 
-            // Attachment Source Dialog
+            // Glassmorphic Attachment Source Dialog
             if (showAttachmentDialog) {
                 AlertDialog(
                     onDismissRequest = { showAttachmentDialog = false },
-                    title = { Text("Choose Attachment Source") },
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = Color(0xFF181824),
+                    icon = {
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(OrangePrimary.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.AttachFile, contentDescription = null, tint = OrangeSecondary, modifier = Modifier.size(28.dp))
+                        }
+                    },
+                    title = { Text("Choose Attachment Source", fontWeight = FontWeight.Bold, color = Color.White) },
                     text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Surface(
                                 onClick = {
                                     attachmentName = "camera_capture_${Random.nextInt(1000, 9999)}.mp4"
                                     showAttachmentDialog = false
                                 },
+                                color = Color.White.copy(alpha = 0.08f),
+                                shape = RoundedCornerShape(16.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.4f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = OrangePrimary)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Take Photo or Video (Live Camera)", color = OrangePrimary)
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = OrangeSecondary)
+                                    Text("Take Photo or Video (Live Camera)", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                                }
                             }
-                            TextButton(
+
+                            Surface(
                                 onClick = {
                                     attachmentName = "workout_log_screenshot.png"
                                     showAttachmentDialog = false
                                 },
+                                color = Color.White.copy(alpha = 0.08f),
+                                shape = RoundedCornerShape(16.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Default.Collections, contentDescription = null, tint = OrangePrimary)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Choose from Gallery", color = OrangePrimary)
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Icon(Icons.Default.Collections, contentDescription = null, tint = OrangeSecondary)
+                                    Text("Choose from Gallery", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                                }
                             }
                         }
                     },
                     confirmButton = {
                         TextButton(onClick = { showAttachmentDialog = false }) {
-                            Text("Cancel")
+                            Text("Cancel", color = Color.White.copy(alpha = 0.6f))
                         }
                     }
                 )
             }
 
-            // Success Dialog
+            // Glassmorphic Success Dialog
             if (showSuccessDialog) {
                 AlertDialog(
                     onDismissRequest = { showSuccessDialog = false },
-                    icon = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = OrangePrimary, modifier = Modifier.size(48.dp)) },
-                    title = { Text("Ticket Submitted!") },
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = Color(0xFF181824),
+                    icon = {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF4CAF50).copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(36.dp))
+                        }
+                    },
+                    title = { Text("Ticket Submitted! 📩", fontWeight = FontWeight.Bold, color = Color.White) },
                     text = {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("Your ticket reference number is:")
+                            Text("Your ticket reference number is:", color = Color.White.copy(alpha = 0.8f))
                             Text(
                                 text = submittedTicketId,
                                 style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = OrangePrimary
+                                fontWeight = FontWeight.ExtraBold,
+                                color = OrangeSecondary
                             )
                             Text(
                                 text = "Our support team will review your ticket and reply within 24 hours.",
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.6f)
                             )
                         }
                     },
@@ -392,7 +444,7 @@ fun RaiseTicketScreen(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
                         ) {
-                            Text("View My Tickets")
+                            Text("View My Tickets", fontWeight = FontWeight.Bold)
                         }
                     },
                     dismissButton = {
@@ -402,7 +454,7 @@ fun RaiseTicketScreen(
                                 onBack()
                             }
                         ) {
-                            Text("Done")
+                            Text("Done", color = Color.White.copy(alpha = 0.6f))
                         }
                     }
                 )
