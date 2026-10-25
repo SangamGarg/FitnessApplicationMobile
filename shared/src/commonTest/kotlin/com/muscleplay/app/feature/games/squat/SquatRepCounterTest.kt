@@ -1,12 +1,13 @@
+
 package com.muscleplay.app.feature.games.squat
 
 import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlin.math.cos
-import kotlin.math.sin
 
 class SquatRepCounterTest {
 
@@ -29,12 +30,17 @@ class SquatRepCounterTest {
             counter.processFrame(frame(angleDegrees = 170f))
         }
 
-        // Move into the squat.
+        // Bend the knees and move the hips downward.
         repeat(15) {
-            counter.processFrame(frame(angleDegrees = 80f))
+            counter.processFrame(
+                frame(
+                    angleDegrees = 80f,
+                    hipDescent = 0.08f
+                )
+            )
         }
 
-        // Return to standing to complete the repetition.
+        // Return to the original standing position.
         repeat(20) {
             counter.processFrame(frame(angleDegrees = 170f))
         }
@@ -48,9 +54,14 @@ class SquatRepCounterTest {
             counter.processFrame(frame(angleDegrees = 170f))
         }
 
-        // The user lowers into the squat but never stands back up.
+        // Descend, but never return to standing.
         repeat(15) {
-            counter.processFrame(frame(angleDegrees = 80f))
+            counter.processFrame(
+                frame(
+                    angleDegrees = 80f,
+                    hipDescent = 0.08f
+                )
+            )
         }
 
         assertEquals(0, counter.state.repetitions)
@@ -61,14 +72,21 @@ class SquatRepCounterTest {
         repeat(15) {
             counter.processFrame(frame(angleDegrees = 170f))
         }
+
         repeat(15) {
-            counter.processFrame(frame(angleDegrees = 80f))
+            counter.processFrame(
+                frame(
+                    angleDegrees = 80f,
+                    hipDescent = 0.08f
+                )
+            )
         }
+
         repeat(20) {
             counter.processFrame(frame(angleDegrees = 170f))
         }
 
-        // Remaining upright must not count another repetition.
+        // Staying upright must not count another repetition.
         repeat(30) {
             counter.processFrame(frame(angleDegrees = 170f))
         }
@@ -111,9 +129,16 @@ class SquatRepCounterTest {
         repeat(15) {
             counter.processFrame(frame(angleDegrees = 170f))
         }
+
         repeat(15) {
-            counter.processFrame(frame(angleDegrees = 80f))
+            counter.processFrame(
+                frame(
+                    angleDegrees = 80f,
+                    hipDescent = 0.08f
+                )
+            )
         }
+
         repeat(20) {
             counter.processFrame(frame(angleDegrees = 170f))
         }
@@ -132,37 +157,42 @@ class SquatRepCounterTest {
     private fun frame(
         angleDegrees: Float,
         visibility: Float = 0.95f,
+        hipDescent: Float = 0f
     ): PoseFrame {
         return PoseFrame(
-            leftLeg = leg(angleDegrees, visibility),
-            rightLeg = leg(angleDegrees, visibility)
+            leftLeg = leg(angleDegrees, visibility, hipDescent),
+            rightLeg = leg(angleDegrees, visibility, hipDescent)
         )
     }
 
     private fun leg(
         angleDegrees: Float,
         visibility: Float,
+        hipDescent: Float
     ): LegPose {
         val radians = angleDegrees.toDouble() * PI / 180.0
         val kneeX = 0.5f
         val kneeY = 0.5f
         val segmentLength = 0.2
 
+        // Shift the entire leg down to simulate hip descent
+        // without changing the constructed knee angle.
         val hip = BodyLandmark(
             x = kneeX,
-            y = kneeY - segmentLength.toFloat(),
+            y = kneeY - segmentLength.toFloat() + hipDescent,
             visibility = visibility
         )
 
         val knee = BodyLandmark(
             x = kneeX,
-            y = kneeY,
+            y = kneeY + hipDescent,
             visibility = visibility
         )
 
         val ankle = BodyLandmark(
             x = kneeX + (sin(radians) * segmentLength).toFloat(),
-            y = kneeY - (cos(radians) * segmentLength).toFloat(),
+            y = kneeY - (cos(radians) * segmentLength).toFloat()
+                    + hipDescent,
             visibility = visibility
         )
 

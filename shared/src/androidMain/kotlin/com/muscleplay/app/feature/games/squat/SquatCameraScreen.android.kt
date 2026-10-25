@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -67,6 +68,10 @@ import com.muscleplay.app.ml.PoseOverlayLandmark
 import kotlinx.coroutines.delay
 import java.util.concurrent.Executors
 import kotlin.time.Duration.Companion.milliseconds
+import com.muscleplay.app.ml.liveness.LivenessChallengeEvaluator
+import com.muscleplay.app.ml.liveness.LivenessConfig
+import com.muscleplay.app.ml.liveness.LivenessStatus
+import com.muscleplay.app.ml.liveness.toLivenessPose
 
 private const val NO_PERSON_WARNING = "No person detected — move into view"
 
@@ -151,6 +156,14 @@ private fun SquatCameraContent(onBack: () -> Unit) {
         mutableStateOf(false)
     }
 
+    // Show the verification-success popup only when verification first succeeds.
+    var verificationSuccessMessage by remember {
+        mutableStateOf(false)
+    }
+    var verificationSuccessToastKey by remember {
+        mutableIntStateOf(0)
+    }
+
     // Used to restart the success-message timer on every reset.
     var resetToastKey by remember {
         mutableIntStateOf(0)
@@ -158,6 +171,21 @@ private fun SquatCameraContent(onBack: () -> Unit) {
 
     val squatDetector = remember {
         SquatExerciseDetector()
+    }
+    val livenessEvaluator = remember {
+        LivenessChallengeEvaluator(
+            config = LivenessConfig(
+                minimumVisibility = 0.45f,
+                requiredStableFrames = 4,
+                minimumFrameIntervalMs = 30L,
+                challengeTimeoutMs = 15_000L,
+                maxAttempts = 3
+            )
+        )
+    }
+
+    var livenessState by remember {
+        mutableStateOf(livenessEvaluator.state)
     }
     var squatState by remember {
         mutableStateOf(SquatState())
@@ -178,7 +206,7 @@ private fun SquatCameraContent(onBack: () -> Unit) {
         mutableStateOf<List<PoseOverlayLandmark>>(emptyList())
     }
     var isHudVisible by remember {
-        mutableStateOf(true)
+        mutableStateOf(false)
     }
     var isSkeletonVisible by remember {
         mutableStateOf(false)
@@ -211,7 +239,10 @@ private fun SquatCameraContent(onBack: () -> Unit) {
             scaleType = PreviewView.ScaleType.FILL_CENTER
         }
     }
-
+    LaunchedEffect(livenessEvaluator) {
+        livenessEvaluator.start(android.os.SystemClock.uptimeMillis())
+        livenessState = livenessEvaluator.state
+    }
     // Delay warnings to ignore brief pose-detection interruptions.
     LaunchedEffect(poseStatus) {
         val isWarningStatus = poseStatus == LEGS_WARNING || poseStatus == NO_PERSON_WARNING
@@ -235,6 +266,15 @@ private fun SquatCameraContent(onBack: () -> Unit) {
         if (resetMessage) {
             delay(2000.milliseconds)
             resetMessage = false
+        }
+    }
+
+    // Hide the verification-success popup after two seconds.
+    // A new key restarts the timer for a later successful verification.
+    LaunchedEffect(verificationSuccessToastKey) {
+        if (verificationSuccessMessage) {
+            delay(3000.milliseconds)
+            verificationSuccessMessage = false
         }
     }
 
@@ -282,28 +322,61 @@ private fun SquatCameraContent(onBack: () -> Unit) {
 
                 onPoseDetected = { pose ->
                     mainHandler.post {
-                        if (pose == null) {
-                            squatState = squatDetector
-                                .onPoseLost()
-                                .toSquatUiState()
+                        val nowMs = SystemClock.uptimeMillis()
 
+                        if (pose == null) {
+                            livenessState = livenessEvaluator.onPoseLost()
+                            squatState = squatDetector.onPoseLost().toSquatUiState()
                             poseStatus = NO_PERSON_WARNING
                         } else {
-                            val updatedState = squatDetector
-                                .processPose(pose)
-                                .toSquatUiState()
+                            // Repetition counting is allowed only when the evaluator explicitly permits it.
+                            if (livenessState.status == LivenessStatus.VERIFIED && livenessState.canCountRepetitions) {
+                                val updatedState = squatDetector.processPose(pose).toSquatUiState()
 
-                            squatState = updatedState
+                                squatState = updatedState
+                                poseStatus = when {
+                                    !updatedState.isPoseReliable -> LEGS_WARNING
+                                    updatedState.phase == SquatPhase.SQUATTING -> "Squat detected — stand up to complete the rep"
 
-                            poseStatus = when {
-                                !updatedState.isPoseReliable ->
-                                    LEGS_WARNING
+                                    else -> "Pose detected — get ready to squat"
+                                }
+                            } else {
+                                when (livenessState.status) {
+                                    LivenessStatus.NOT_STARTED,
+                                    LivenessStatus.CHALLENGE_REQUIRED,
+                                    LivenessStatus.CHALLENGE_IN_PROGRESS,
+                                        -> {
+                                        val previousStatus = livenessState.status
+                                        livenessState = livenessEvaluator.process(
+                                            pose.toLivenessPose(), nowMs
+                                        )
 
-                                updatedState.phase == SquatPhase.SQUATTING ->
-                                    "Squat detected — stand up to complete the rep"
+                                        // Trigger the popup only on the transition to successful verification.
+                                        val verificationJustSucceeded =
+                                            previousStatus != LivenessStatus.VERIFIED && livenessState.status == LivenessStatus.VERIFIED && livenessState.canCountRepetitions
 
-                                else ->
-                                    "Pose detected — get ready to squat"
+                                        if (verificationJustSucceeded) {
+                                            verificationSuccessMessage = true
+                                            verificationSuccessToastKey++
+                                        }
+
+                                        poseStatus = livenessState.instruction
+                                    }
+
+                                    LivenessStatus.PAUSED,
+                                    LivenessStatus.FAILED,
+                                        -> {
+                                        poseStatus = livenessState.instruction
+                                    }
+
+                                    LivenessStatus.VERIFIED -> {
+                                        // Defensive fallback: VERIFIED without permission to count.
+                                        poseStatus = "Preparing verification..."
+                                    }
+                                }
+
+                                // Never send verification frames to the repetition counter.
+                                squatState = squatDetector.onPoseLost().toSquatUiState()
                             }
                         }
                     }
@@ -388,8 +461,19 @@ private fun SquatCameraContent(onBack: () -> Unit) {
             factory = { previewView }, modifier = Modifier.fillMaxSize()
         )
 
-        // Layer 2: Live MediaPipe skeleton
-        if (isSkeletonVisible) {
+
+        // Verification overlay: progress indicator, challenge instructions, and retry action.
+        val isVerified =
+            livenessState.status == LivenessStatus.VERIFIED && livenessState.canCountRepetitions
+        val isVerificationActive =
+            livenessState.status == LivenessStatus.NOT_STARTED || livenessState.status == LivenessStatus.CHALLENGE_REQUIRED || livenessState.status == LivenessStatus.CHALLENGE_IN_PROGRESS || livenessState.status == LivenessStatus.PAUSED || livenessState.status == LivenessStatus.FAILED
+        val shouldShowSkeleton = isVerificationActive || isSkeletonVisible
+        val canRetry =
+            livenessState.status == LivenessStatus.PAUSED || livenessState.status == LivenessStatus.FAILED
+
+
+// Layer 2: Live MediaPipe skeleton
+        if (shouldShowSkeleton) {
             PoseSkeletonOverlay(
                 landmarks = poseLandmarks,
                 modifier = Modifier.matchParentSize(),
@@ -399,6 +483,110 @@ private fun SquatCameraContent(onBack: () -> Unit) {
                 skeletonColor = skeletonColor
             )
         }
+        if (!isVerified) {
+            Column(
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp)
+                    .fillMaxWidth().background(Color(0xCC101820), RoundedCornerShape(16.dp)).border(
+                        width = 1.dp, color = Color(0x557CF5B4), shape = RoundedCornerShape(16.dp)
+                    ).padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (isVerificationActive) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(38.dp),
+                        color = Color(0xFF7CF5B4),
+                        strokeWidth = 3.dp
+                    )
+
+                    Text(
+                        text = if (livenessState.status == LivenessStatus.CHALLENGE_IN_PROGRESS) "Verifying your movement..." else "Preparing verification...",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Text(
+                        text = livenessState.instruction,
+                        color = Color(0xFFE0E7EB),
+                        fontSize = 18.sp
+                    )
+
+                    livenessState.reason?.let { reason ->
+                        Text(
+                            text = reason, color = Color(0xFFFFD180), fontSize = 12.sp
+                        )
+                    }
+                }
+
+                if (canRetry) {
+                    Text(
+                        text = if (livenessState.status == LivenessStatus.FAILED) {
+                            "Verification failed"
+                        } else {
+                            "Verification paused"
+                        }, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold
+                    )
+
+                    Text(
+                        text = livenessState.reason ?: livenessState.instruction,
+                        color = Color(0xFFE0E7EB),
+                        fontSize = 14.sp
+                    )
+
+                    Button(
+                        onClick = {
+                            livenessEvaluator.restart(SystemClock.uptimeMillis())
+                            livenessState = livenessEvaluator.state
+                            squatState = squatDetector.reset().toSquatUiState()
+                            poseStatus = livenessState.instruction
+                            warningMessage = null
+                            isSkeletonVisible = true
+                        }, shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF7CF5B4), contentColor = Color(0xFF101820)
+                        )
+                    ) {
+                        Text("Revalidate", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        // Verification-success popup. It disappears automatically after two seconds.
+        if (verificationSuccessMessage) {
+            Row(
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp).background(
+                    color = Color(0xEE163D2D), shape = RoundedCornerShape(12.dp)
+                ).border(
+                    width = 1.dp, color = Color(0xFF7CF5B4), shape = RoundedCornerShape(12.dp)
+                ).padding(horizontal = 18.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "✓",
+                    color = Color(0xFF7CF5B4),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "Verification Successful!",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = "Start exercising!", color = Color(0xFFB8D8D0), fontSize = 13.sp
+                    )
+                }
+            }
+        }
+
         // Reset-success popup.
         // IMPORTANT: This must remain inside the Box.
         if (resetMessage) {
@@ -503,7 +691,7 @@ private fun SquatCameraContent(onBack: () -> Unit) {
                 })
         }
         // Bottom exercise Options panel.
-        if (isHudVisible) {
+        if (isVerified && isHudVisible) {
             Column(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(
                     horizontal = 12.dp, vertical = 12.dp
@@ -618,8 +806,7 @@ private fun SquatCameraContent(onBack: () -> Unit) {
                     Text("Reset")
                 }
             }
-        } else {
-            // Show Options when the panel is hidden.
+        } else if (isVerified) {
             Button(
                 onClick = {
                     isHudVisible = true
@@ -635,28 +822,26 @@ private fun SquatCameraContent(onBack: () -> Unit) {
         }
     }
 }
+
 private fun ExerciseState.toSquatUiState(): SquatState {
     return SquatState(
         repetitions = repetitions,
         phase = when (phase) {
-            ExercisePhase.WAITING_FOR_START ->
-                SquatPhase.WAITING_FOR_STANDING
+            ExercisePhase.WAITING_FOR_START -> SquatPhase.WAITING_FOR_STANDING
 
-            ExercisePhase.READY ->
-                SquatPhase.STANDING
+            ExercisePhase.READY -> SquatPhase.STANDING
 
-            ExercisePhase.ACTIVE ->
-                SquatPhase.SQUATTING
+            ExercisePhase.ACTIVE -> SquatPhase.SQUATTING
 
             ExercisePhase.COMPLETED,
-            ExercisePhase.UNKNOWN
-                ->
-                SquatPhase.WAITING_FOR_STANDING
+            ExercisePhase.UNKNOWN,
+                -> SquatPhase.WAITING_FOR_STANDING
         },
         kneeAngleDegrees = primaryAngleDegrees,
         isPoseReliable = isPoseReliable,
     )
 }
+
 private fun ImageProxy.toRgbaBitmap(): Bitmap {
     require(planes.isNotEmpty()) {
         "Camera frame has no image planes"

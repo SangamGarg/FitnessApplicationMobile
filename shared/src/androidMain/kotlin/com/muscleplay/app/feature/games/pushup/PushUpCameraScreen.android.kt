@@ -69,6 +69,10 @@ import com.muscleplay.app.ml.PoseOverlayLandmark
 import kotlinx.coroutines.delay
 import java.util.concurrent.Executors
 import kotlin.time.Duration.Companion.milliseconds
+import com.muscleplay.app.ml.liveness.LivenessChallengeEvaluator
+import com.muscleplay.app.ml.liveness.LivenessConfig
+import com.muscleplay.app.ml.liveness.LivenessStatus
+import com.muscleplay.app.ml.liveness.toLivenessPose
 
 private const val PUSH_UP_TAG = "PushUpCamera"
 private const val NO_PERSON_WARNING = "No person detected — move into view"
@@ -102,8 +106,7 @@ actual fun PushUpCameraScreen(onBack: () -> Unit) {
 
     if (showRulesDialog) {
         ExerciseRulesDialog(
-            title = "Push-up",
-            rules = listOf(
+            title = "Push-up", rules = listOf(
                 "Position the camera so your upper body and arms are visible.",
                 "Use a side-on position for more reliable elbow-angle detection.",
                 "Keep your shoulders, elbows and wrists visible throughout the exercise.",
@@ -114,15 +117,12 @@ actual fun PushUpCameraScreen(onBack: () -> Unit) {
                 "Yellow skeleton: tracking your movement or waiting for the starting position.",
                 "Red skeleton: your pose is unreliable. Adjust your position.",
                 "Use Show/Hide Skeleton to control the visual overlay. Counting continues when it is hidden."
-            ),
-            onContinue = { dontShowAgain ->
+            ), onContinue = { dontShowAgain ->
                 rulesPreferences.setDontShowAgain(
-                    exerciseId = "pushup",
-                    dontShowAgain = dontShowAgain
+                    exerciseId = "pushup", dontShowAgain = dontShowAgain
                 )
                 showRulesDialog = false
-            }
-        )
+            })
         return
     }
 
@@ -138,8 +138,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
     var cameraGranted by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.CAMERA
+                context, Manifest.permission.CAMERA
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
@@ -161,7 +160,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
         mutableStateOf<List<PoseOverlayLandmark>>(emptyList())
     }
 
-    var isHudVisible by remember { mutableStateOf(true) }
+    var isHudVisible by remember { mutableStateOf(false) }
     var isSkeletonVisible by remember { mutableStateOf(false) }
     var showPushUpHelp by remember { mutableStateOf(false) }
 
@@ -193,8 +192,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
     }
 
     LaunchedEffect(poseStatus) {
-        val isWarningStatus =
-            poseStatus == NO_PERSON_WARNING || poseStatus == ARMS_WARNING
+        val isWarningStatus = poseStatus == NO_PERSON_WARNING || poseStatus == ARMS_WARNING
 
         if (isWarningStatus) {
             delay(800.milliseconds)
@@ -227,16 +225,14 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                cameraError
-                    ?: "MusclePlay needs camera access to detect your push-ups."
+                cameraError ?: "MusclePlay needs camera access to detect your push-ups."
             )
 
             Button(
                 onClick = {
                     cameraError = null
                     permissionLauncher.launch(Manifest.permission.CAMERA)
-                }
-            ) {
+                }) {
                 Text("Grant camera permission")
             }
 
@@ -270,11 +266,9 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                         poseStatus = when {
                             pose == null -> NO_PERSON_WARNING
                             !updatedState.isPoseReliable -> ARMS_WARNING
-                            updatedState.phase == ExercisePhase.ACTIVE ->
-                                "Push-up detected — push back up to complete the rep"
+                            updatedState.phase == ExercisePhase.ACTIVE -> "Push-up detected — push back up to complete the rep"
 
-                            else ->
-                                updatedState.feedback
+                            else -> updatedState.feedback
                         }
                     }
                 },
@@ -289,8 +283,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                             poseLandmarks = landmarks.orEmpty()
                         }
                     }
-                }
-            )
+                })
 
             val providerFuture = ProcessCameraProvider.getInstance(context)
 
@@ -306,14 +299,11 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                             it.surfaceProvider = previewView.surfaceProvider
                         }
 
-                        val analysis = ImageAnalysis.Builder()
-                            .setOutputImageFormat(
-                                ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888
-                            )
-                            .setBackpressureStrategy(
-                                ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
-                            )
-                            .build()
+                        val analysis = ImageAnalysis.Builder().setOutputImageFormat(
+                            ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888
+                        ).setBackpressureStrategy(
+                            ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
+                        ).build()
 
                         analysis.setAnalyzer(analysisExecutor) { imageProxy ->
                             try {
@@ -321,14 +311,11 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                                 val mpImage = BitmapImageBuilder(bitmap).build()
 
                                 poseHelper?.detect(
-                                    mpImage,
-                                    SystemClock.uptimeMillis()
+                                    mpImage, SystemClock.uptimeMillis()
                                 )
                             } catch (exception: Exception) {
                                 Log.e(
-                                    PUSH_UP_TAG,
-                                    "Frame processing failed",
-                                    exception
+                                    PUSH_UP_TAG, "Frame processing failed", exception
                                 )
                             } finally {
                                 imageProxy.close()
@@ -337,25 +324,19 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
 
                         provider.unbindAll()
                         provider.bindToLifecycle(
-                            lifecycleOwner,
-                            CameraSelector.DEFAULT_FRONT_CAMERA,
-                            preview,
-                            analysis
+                            lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis
                         )
                     } catch (exception: Exception) {
                         mainHandler.post {
                             if (!disposed) {
-                                cameraError =
-                                    exception.message ?: "Unable to start camera"
+                                cameraError = exception.message ?: "Unable to start camera"
                             }
                         }
                     }
-                },
-                ContextCompat.getMainExecutor(context)
+                }, ContextCompat.getMainExecutor(context)
             )
         } catch (exception: Exception) {
-            cameraError =
-                exception.message ?: "Unable to initialize pose detection"
+            cameraError = exception.message ?: "Unable to initialize pose detection"
         }
 
         onDispose {
@@ -368,8 +349,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
-            factory = { previewView },
-            modifier = Modifier.fillMaxSize()
+            factory = { previewView }, modifier = Modifier.fillMaxSize()
         )
 
         if (isSkeletonVisible) {
@@ -385,27 +365,16 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
 
         if (resetMessage) {
             Row(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 100.dp)
-                    .background(
-                        color = Color(0xEE163D2D),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = PushUpGreen,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 100.dp).background(
+                    color = Color(0xEE163D2D), shape = RoundedCornerShape(12.dp)
+                ).border(
+                    width = 1.dp, color = PushUpGreen, shape = RoundedCornerShape(12.dp)
+                ).padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "✓",
-                    color = PushUpGreen,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "✓", color = PushUpGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = "Reps reset successfully!",
@@ -418,26 +387,17 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
 
         warningMessage?.let { message ->
             Row(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(top = 8.dp, start = 8.dp, end = 100.dp)
-                    .background(
-                        color = Color(0xEE332719),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = Color(0xFFFFB74D),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                modifier = Modifier.align(Alignment.TopStart)
+                    .padding(top = 8.dp, start = 8.dp, end = 100.dp).background(
+                        color = Color(0xEE332719), shape = RoundedCornerShape(12.dp)
+                    ).border(
+                        width = 1.dp, color = Color(0xFFFFB74D), shape = RoundedCornerShape(12.dp)
+                    ).padding(horizontal = 14.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "⚠",
-                    color = Color(0xFFFFB74D),
-                    fontSize = 18.sp
+                    text = "⚠", color = Color(0xFFFFB74D), fontSize = 18.sp
                 )
                 Text(
                     text = message,
@@ -450,20 +410,13 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
 
         // Repetition counter and help button.
         Column(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp)
-                .background(
-                    color = PushUpDark,
-                    shape = RoundedCornerShape(18.dp)
-                )
-                .padding(horizontal = 24.dp, vertical = 12.dp),
+            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(
+                color = PushUpDark, shape = RoundedCornerShape(18.dp)
+            ).padding(horizontal = 24.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "REPS",
-                style = MaterialTheme.typography.labelSmall,
-                color = PushUpMuted
+                text = "REPS", style = MaterialTheme.typography.labelSmall, color = PushUpMuted
             )
 
             Text(
@@ -480,14 +433,11 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                 shape = CircleShape,
                 contentPadding = PaddingValues(0.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = PushUpButton,
-                    contentColor = Color.White
+                    containerColor = PushUpButton, contentColor = Color.White
                 )
             ) {
                 Text(
-                    text = "?",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "?", fontSize = 20.sp, fontWeight = FontWeight.Bold
                 )
             }
         }
@@ -495,24 +445,16 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
         if (showPushUpHelp) {
             // Uses the existing exercise-help content for push-ups.
             ExerciseHelpDialog(
-                content = ExerciseHelpContents.pushUp,
-                onDismiss = { showPushUpHelp = false }
-            )
+                content = ExerciseHelpContents.pushUp, onDismiss = { showPushUpHelp = false })
         }
 
         // Bottom options panel, styled like the squat screen.
         if (isHudVisible) {
             Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 12.dp)
-                    .background(
-                        color = PushUpDark,
-                        shape = RoundedCornerShape(18.dp)
-                    )
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 12.dp).background(
+                        color = PushUpDark, shape = RoundedCornerShape(18.dp)
+                    ).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
                     text = statusMessageForHud(exerciseState, poseStatus),
@@ -531,12 +473,9 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                         style = MaterialTheme.typography.bodyMedium,
                         color = PushUpMuted
                     )
-                    Text(
-                        text = exerciseState.primaryAngleDegrees
-                            ?.let { "${it.toInt()}°" } ?: "--",
+                    Text(text = exerciseState.primaryAngleDegrees?.let { "${it.toInt()}°" } ?: "--",
                         style = MaterialTheme.typography.titleLarge,
-                        color = Color.White
-                    )
+                        color = Color.White)
                 }
 
                 Row(
@@ -550,9 +489,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                         color = PushUpMuted
                     )
                     Text(
-                        text = exerciseState.phase.name
-                            .replace('_', ' ')
-                            .lowercase()
+                        text = exerciseState.phase.name.replace('_', ' ').lowercase()
                             .replaceFirstChar { it.uppercase() },
                         style = MaterialTheme.typography.titleMedium,
                         color = PushUpGreen
@@ -561,9 +498,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
 
                 cameraError?.let { error ->
                     Text(
-                        text = error,
-                        color = PushUpRed,
-                        style = MaterialTheme.typography.bodySmall
+                        text = error, color = PushUpRed, style = MaterialTheme.typography.bodySmall
                     )
                 }
 
@@ -576,8 +511,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = PushUpGreen,
-                            contentColor = PushUpDark
+                            containerColor = PushUpGreen, contentColor = PushUpDark
                         )
                     ) {
                         Text("Hide Options")
@@ -588,8 +522,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = PushUpButton,
-                            contentColor = Color.White
+                            containerColor = PushUpButton, contentColor = Color.White
                         )
                     ) {
                         Text("Back")
@@ -601,8 +534,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = PushUpPanel,
-                        contentColor = Color.White
+                        containerColor = PushUpPanel, contentColor = Color.White
                     )
                 ) {
                     Text(
@@ -614,8 +546,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                 Button(
                     onClick = {
                         exerciseState = detector.reset()
-                        poseStatus =
-                            "Counter reset — straighten your arms to begin"
+                        poseStatus = "Counter reset — straighten your arms to begin"
                         cameraError = null
                         resetMessage = true
                         resetToastKey++
@@ -623,8 +554,7 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = PushUpPanel,
-                        contentColor = Color.White
+                        containerColor = PushUpPanel, contentColor = Color.White
                     )
                 ) {
                     Text("Reset")
@@ -633,13 +563,10 @@ private fun PushUpCameraContent(onBack: () -> Unit) {
         } else {
             Button(
                 onClick = { isHudVisible = true },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = PushUpGreen,
-                    contentColor = PushUpDark
+                    containerColor = PushUpGreen, contentColor = PushUpDark
                 )
             ) {
                 Text("Show Options")
@@ -670,11 +597,7 @@ private fun ImageProxy.toRgbaBitmap(): Bitmap {
 
     val expectedRowBytes = width * 4
 
-    if (
-        plane.pixelStride == 4 &&
-        plane.rowStride == expectedRowBytes &&
-        buffer.remaining() >= height * expectedRowBytes
-    ) {
+    if (plane.pixelStride == 4 && plane.rowStride == expectedRowBytes && buffer.remaining() >= height * expectedRowBytes) {
         return createBitmap(width, height).apply {
             copyPixelsFromBuffer(buffer)
         }
@@ -695,11 +618,7 @@ private fun ImageProxy.toRgbaBitmap(): Bitmap {
                 val blue = rgba[index + 2].toInt() and 0xFF
                 val alpha = rgba[index + 3].toInt() and 0xFF
 
-                pixels[y * width + x] =
-                    (alpha shl 24) or
-                            (red shl 16) or
-                            (green shl 8) or
-                            blue
+                pixels[y * width + x] = (alpha shl 24) or (red shl 16) or (green shl 8) or blue
             }
         }
     }
