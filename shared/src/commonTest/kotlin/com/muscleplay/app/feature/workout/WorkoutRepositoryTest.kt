@@ -1,4 +1,4 @@
-package com.muscleplay.app.feature.workouts
+package com.muscleplay.app.feature.workout
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

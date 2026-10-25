@@ -1,4 +1,4 @@
-package com.muscleplay.app.feature.workouts
+package com.muscleplay.app.feature.workout
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,20 +13,17 @@ interface WorkoutRepository {
 
 class InMemoryWorkoutRepository : WorkoutRepository {
 
-    private val _workoutState =
-        MutableStateFlow(WorkoutUiState())
+    private val _workoutState = MutableStateFlow(WorkoutUiState())
 
     override val workoutState: StateFlow<WorkoutUiState> =
         _workoutState.asStateFlow()
 
     override fun completeRep() {
         val current = _workoutState.value
-
         if (current.isCompleted) return
 
-        val updatedReps =
-            (current.completedReps + 1)
-                .coerceAtMost(current.targetReps)
+        val updatedReps = (current.completedReps + 1)
+            .coerceAtMost(current.targetReps)
 
         _workoutState.value = current.copy(
             completedReps = updatedReps,

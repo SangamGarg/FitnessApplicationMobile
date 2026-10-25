@@ -71,4 +71,73 @@ object ExerciseHelpContents {
             )
         )
     )
+
+
+    val pushUp = ExerciseHelpContent(
+        title = "Push-up Guide",
+        sections = listOf(
+            ExerciseHelpSection(
+                heading = "1. Starting Position",
+                instructions = listOf(
+                    "Start in a high plank position with your hands slightly wider than shoulder-width apart.",
+                    "Keep your shoulders, elbows and wrists visible to the camera.",
+                    "Keep your body aligned from your head through your hips to your heels.",
+                    "Position the camera at a side angle so your arm movement is easier to track.",
+                    "Straighten your arms to establish the starting position."
+                )
+            ),
+            ExerciseHelpSection(
+                heading = "2. How to Perform a Push-up",
+                instructions = listOf(
+                    "Begin with your arms straight and your body aligned.",
+                    "Bend your elbows to lower your chest toward the floor with control.",
+                    "Keep your elbows at a comfortable angle relative to your torso.",
+                    "Lower yourself only as far as you can comfortably maintain good form.",
+                    "Push through your hands to straighten your arms again.",
+                    "Return to the top position to complete one repetition."
+                )
+            ),
+            ExerciseHelpSection(
+                heading = "3. Common Mistakes",
+                instructions = listOf(
+                    "Avoid letting your hips sag or rise excessively.",
+                    "Avoid flaring your elbows excessively outward.",
+                    "Do not drop your body suddenly or bounce at the bottom.",
+                    "Avoid shortening the movement just to increase your repetition count.",
+                    "Do not force a range of motion that causes pain."
+                )
+            ),
+            ExerciseHelpSection(
+                heading = "4. Skeleton Color Guide",
+                instructions = listOf(
+                    "Green: The pose is reliable and the tracker recognizes the ready position.",
+                    "Yellow: Waiting for the starting position or tracking an active push-up.",
+                    "Red: The tracker considers the pose unreliable.",
+                    "Keep your shoulder, elbow and wrist visible for more reliable arm-angle detection.",
+                    "You can toggle the skeleton from the exercise options panel. Rep counting continues when it is hidden."
+                )
+            ),
+            ExerciseHelpSection(
+                heading = "5. Camera Tips",
+                instructions = listOf(
+                    "Use a side-on camera position for clearer elbow-angle measurements.",
+                    "Keep your upper body and arms inside the camera frame.",
+                    "Use sufficient lighting for pose detection.",
+                    "Place your phone securely before starting your workout.",
+                    "If tracking is unreliable, adjust your position until your arm landmarks are visible."
+                )
+            ),
+            ExerciseHelpSection(
+                heading = "6. Safety Tips",
+                instructions = listOf(
+                    "Start with a variation that matches your current fitness level.",
+                    "Perform each repetition slowly and with control.",
+                    "Stop if you experience pain, dizziness or unusual discomfort.",
+                    "Consider knee push-ups or wall push-ups if standard push-ups are too challenging.",
+                    "Seek guidance from a qualified fitness professional if you are new to push-ups or have an injury."
+                )
+            )
+        )
+    )
+
 }

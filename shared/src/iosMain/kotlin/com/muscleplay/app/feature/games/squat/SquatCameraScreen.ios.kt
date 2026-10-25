@@ -1,4 +1,4 @@
-package com.muscleplay.app.feature.games
+package com.muscleplay.app.feature.games.squat
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

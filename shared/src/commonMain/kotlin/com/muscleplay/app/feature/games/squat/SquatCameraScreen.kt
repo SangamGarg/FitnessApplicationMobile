@@ -1,4 +1,4 @@
-package com.muscleplay.app.feature.games
+package com.muscleplay.app.feature.games.squat
 
 import androidx.compose.runtime.Composable
 

@@ -1,8 +1,8 @@
 
 package com.muscleplay.app.core.di
 
-import com.muscleplay.app.feature.workouts.InMemoryWorkoutRepository
-import com.muscleplay.app.feature.workouts.WorkoutRepository
+import com.muscleplay.app.feature.workout.InMemoryWorkoutRepository
+import com.muscleplay.app.feature.workout.WorkoutRepository
 
 class AppContainer {
 

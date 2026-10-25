@@ -1,6 +1,6 @@
 package com.muscleplay.app.navigation
 
-import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -15,25 +15,28 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.NavDestination.Companion.hierarchy
 import com.muscleplay.app.core.di.AppContainer
 import com.muscleplay.app.feature.calculators.CalculatorsScreen
 import com.muscleplay.app.feature.games.GamesScreen
 import com.muscleplay.app.feature.games.RepChallengeScreen
-import com.muscleplay.app.feature.games.SquatCameraScreen
+import com.muscleplay.app.feature.games.pushup.PushUpCameraScreen
+import com.muscleplay.app.feature.games.squat.SquatCameraScreen
 import com.muscleplay.app.feature.home.HomeScreen
 import com.muscleplay.app.feature.profile.ProfileScreen
-import com.muscleplay.app.feature.workouts.WorkoutsScreen
+import com.muscleplay.app.feature.workout.WorkoutScreen
 
 private object Routes {
     const val SQUAT_MASTER_ROUTE = "squat_master"
     const val REP_CHALLENGE_ROUTE = "rep_challenge"
+    const val PUSH_UP_MASTER_ROUTE = "push_up_master"
+
     const val HOME = "home"
     const val WORKOUTS = "workouts"
     const val GAMES = "games"
@@ -64,9 +67,8 @@ fun MusclePlayNavigation(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val isSquatMasterScreen = currentRoute == Routes.SQUAT_MASTER_ROUTE
     val bottomBarHiddenRoutes = setOf(
-        Routes.SQUAT_MASTER_ROUTE, Routes.REP_CHALLENGE_ROUTE
+        Routes.SQUAT_MASTER_ROUTE, Routes.REP_CHALLENGE_ROUTE, Routes.PUSH_UP_MASTER_ROUTE
     )
     val shouldHideBottomBar = currentRoute in bottomBarHiddenRoutes
 
@@ -116,7 +118,7 @@ fun MusclePlayNavigation(
                 HomeScreen()
             }
             composable(Routes.WORKOUTS) {
-                WorkoutsScreen(
+                WorkoutScreen(
                     repository = appContainer.workoutRepository
                 )
             }
@@ -130,6 +132,10 @@ fun MusclePlayNavigation(
 
                             Routes.REP_CHALLENGE_ROUTE -> {
                                 navController.navigate(Routes.REP_CHALLENGE_ROUTE)
+                            }
+
+                            Routes.PUSH_UP_MASTER_ROUTE -> {
+                                navController.navigate(Routes.PUSH_UP_MASTER_ROUTE)
                             }
 
                             else -> {
@@ -152,6 +158,12 @@ fun MusclePlayNavigation(
             }
             composable(Routes.SQUAT_MASTER_ROUTE) {
                 SquatCameraScreen(
+                    onBack = {
+                        navController.popBackStack()
+                    })
+            }
+            composable(Routes.PUSH_UP_MASTER_ROUTE) {
+                PushUpCameraScreen(
                     onBack = {
                         navController.popBackStack()
                     })

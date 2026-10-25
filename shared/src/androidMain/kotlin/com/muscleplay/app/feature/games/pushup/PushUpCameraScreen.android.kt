@@ -1,4 +1,4 @@
-package com.muscleplay.app.feature.games
+package com.muscleplay.app.feature.games.pushup
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -11,10 +11,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.camera.core.CameraSelector
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -26,15 +22,21 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -55,18 +57,35 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.mediapipe.framework.image.BitmapImageBuilder
+import com.muscleplay.app.feature.games.ExerciseHelpContents
+import com.muscleplay.app.feature.games.ExerciseHelpDialog
+import com.muscleplay.app.feature.games.ExerciseRulesDialog
+import com.muscleplay.app.feature.games.ExerciseRulesPreferences
+import com.muscleplay.app.feature.games.PoseSkeletonOverlay
+import com.muscleplay.app.feature.games.core.ExercisePhase
+import com.muscleplay.app.feature.games.core.ExerciseState
 import com.muscleplay.app.ml.PoseLandmarkerHelper
 import com.muscleplay.app.ml.PoseOverlayLandmark
+import kotlinx.coroutines.delay
 import java.util.concurrent.Executors
 import kotlin.time.Duration.Companion.milliseconds
 
+private const val PUSH_UP_TAG = "PushUpCamera"
 private const val NO_PERSON_WARNING = "No person detected — move into view"
+private const val ARMS_WARNING = "Move your shoulder, elbow and wrist into view"
 
-private const val LEGS_WARNING = "Move your legs into view"
+private val PushUpGreen = Color(0xFF7CF5B4)
+private val PushUpDark = Color(0xFF101820)
+private val PushUpMuted = Color(0xFFB8D8D0)
+private val PushUpYellow = Color(0xFFFFC107)
+private val PushUpRed = Color(0xFFFF5252)
+private val PushUpPanel = Color(0xFF24313B)
+private val PushUpButton = Color(0xFF34434E)
 
 @Composable
-actual fun SquatCameraScreen(onBack: () -> Unit) {
+actual fun PushUpCameraScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+
     val rulesPreferences = remember(context) {
         ExerciseRulesPreferences(context.applicationContext)
     }
@@ -74,132 +93,96 @@ actual fun SquatCameraScreen(onBack: () -> Unit) {
     var rulesDecisionReady by remember { mutableStateOf(false) }
     var showRulesDialog by remember { mutableStateOf(false) }
 
-    // Read the saved preference before composing anything camera-related.
     LaunchedEffect(Unit) {
-        showRulesDialog = rulesPreferences.shouldShowRules("squat")
+        showRulesDialog = rulesPreferences.shouldShowRules("pushup")
         rulesDecisionReady = true
     }
 
-    if (!rulesDecisionReady) {
-        return
-    }
+    if (!rulesDecisionReady) return
 
     if (showRulesDialog) {
-
         ExerciseRulesDialog(
-            title = "Squat",
+            title = "Push-up",
             rules = listOf(
-                "Keep your full body inside the camera frame.",
-                "Make sure your legs, knees, and feet are visible.",
-                "Perform each squat slowly and with control.",
-                "Stand upright to begin and complete each repetition.",
-                "Stop if you experience pain, dizziness, or discomfort.",
-
-                // Skeleton overlay guidance
-                "Green skeleton: Your pose is detected reliably while standing.",
-                "Yellow skeleton: The app is waiting for your starting position or tracking an active squat.",
-                "Red skeleton: Your pose is unreliable. Adjust your position so your legs and joints are visible.",
-                "Use the Show/Hide Skeleton button to turn the visual overlay on or off. Squat counting continues when the overlay is hidden."
+                "Position the camera so your upper body and arms are visible.",
+                "Use a side-on position for more reliable elbow-angle detection.",
+                "Keep your shoulders, elbows and wrists visible throughout the exercise.",
+                "Begin with your arms straight.",
+                "Lower your body with control, then push back up to complete a repetition.",
+                "Avoid rushing or forcing a movement that causes pain or discomfort.",
+                "Green skeleton: your pose is detected reliably.",
+                "Yellow skeleton: tracking your movement or waiting for the starting position.",
+                "Red skeleton: your pose is unreliable. Adjust your position.",
+                "Use Show/Hide Skeleton to control the visual overlay. Counting continues when it is hidden."
             ),
             onContinue = { dontShowAgain ->
                 rulesPreferences.setDontShowAgain(
-                    exerciseId = "squat",
+                    exerciseId = "pushup",
                     dontShowAgain = dontShowAgain
                 )
                 showRulesDialog = false
             }
         )
-
         return
     }
 
-    // Camera resources and all exercise UI exist only after the rules gate.
-    SquatCameraContent(onBack = onBack)
+    PushUpCameraContent(onBack = onBack)
 }
 
 @OptIn(ExperimentalGetImage::class)
 @Composable
-private fun SquatCameraContent(onBack: () -> Unit) {
+private fun PushUpCameraContent(onBack: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var cameraGranted by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
-                context, Manifest.permission.CAMERA
+                context,
+                Manifest.permission.CAMERA
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
 
-    var cameraError by remember {
-        mutableStateOf<String?>(null)
-    }
+    var cameraError by remember { mutableStateOf<String?>(null) }
+    var poseStatus by remember { mutableStateOf("Waiting for camera…") }
+    var warningMessage by remember { mutableStateOf<String?>(null) }
 
-    var poseStatus by remember {
-        mutableStateOf("Waiting for camera…")
-    }
+    var resetMessage by remember { mutableStateOf(false) }
+    var resetToastKey by remember { mutableIntStateOf(0) }
 
-    var warningMessage by remember {
-        mutableStateOf<String?>(null)
-    }
+    val detector = remember { PushUpExerciseDetector() }
 
-    var resetMessage by remember {
-        mutableStateOf(false)
-    }
-
-    // Used to restart the success-message timer on every reset.
-    var resetToastKey by remember {
-        mutableIntStateOf(0)
-    }
-
-    val squatCounter = remember {
-        SquatRepCounter()
-    }
-
-    var squatState by remember {
-        mutableStateOf(SquatState())
-    }
-
-
-    val skeletonColor = when {
-        !squatState.isPoseReliable -> Color(0xFFFF5252) // Red: unreliable pose
-
-        squatState.phase == SquatPhase.WAITING_FOR_STANDING -> Color(0xFFFFC107) // Yellow: waiting for valid start
-
-        squatState.phase == SquatPhase.SQUATTING -> Color(0xFFFFC107) // Yellow: squat in progress
-
-        else -> Color(0xFF7CF5B4) // Green: reliable standing pose
+    var exerciseState by remember {
+        mutableStateOf(ExerciseState())
     }
 
     var poseLandmarks by remember {
         mutableStateOf<List<PoseOverlayLandmark>>(emptyList())
     }
-    var isHudVisible by remember {
-        mutableStateOf(true)
-    }
-    var isSkeletonVisible by remember {
-        mutableStateOf(false)
-    }
-    var showSquatHelp by remember {
-        mutableStateOf(false)
-    }
-    val mainHandler = remember {
-        Handler(Looper.getMainLooper())
+
+    var isHudVisible by remember { mutableStateOf(true) }
+    var isSkeletonVisible by remember { mutableStateOf(false) }
+    var showPushUpHelp by remember { mutableStateOf(false) }
+
+    val skeletonColor = when {
+        !exerciseState.isPoseReliable -> PushUpRed
+        exerciseState.phase == ExercisePhase.WAITING_FOR_START -> PushUpYellow
+        exerciseState.phase == ExercisePhase.ACTIVE -> PushUpYellow
+        else -> PushUpGreen
     }
 
-    val analysisExecutor = remember {
-        Executors.newSingleThreadExecutor()
-    }
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         cameraGranted = granted
-
-        cameraError = if (!granted) {
-            "Camera permission is required for squat detection."
-        } else {
+        cameraError = if (granted) {
             null
+        } else {
+            "Camera permission is required for push-up detection."
         }
     }
 
@@ -209,16 +192,14 @@ private fun SquatCameraContent(onBack: () -> Unit) {
         }
     }
 
-    // Delay warnings to ignore brief pose-detection interruptions.
     LaunchedEffect(poseStatus) {
-        val isWarningStatus = poseStatus == LEGS_WARNING || poseStatus == NO_PERSON_WARNING
+        val isWarningStatus =
+            poseStatus == NO_PERSON_WARNING || poseStatus == ARMS_WARNING
 
         if (isWarningStatus) {
-            kotlinx.coroutines.delay(800.milliseconds)
+            delay(800.milliseconds)
 
-            // This effect is cancelled if poseStatus changes
-            // while the delay is running.
-            if (poseStatus == LEGS_WARNING || poseStatus == NO_PERSON_WARNING) {
+            if (poseStatus == NO_PERSON_WARNING || poseStatus == ARMS_WARNING) {
                 warningMessage = poseStatus
             }
         } else {
@@ -226,11 +207,9 @@ private fun SquatCameraContent(onBack: () -> Unit) {
         }
     }
 
-    // Hide the reset-success message after two seconds.
-    // Changing resetToastKey restarts the timer on each reset.
     LaunchedEffect(resetToastKey) {
         if (resetMessage) {
-            kotlinx.coroutines.delay(2000.milliseconds)
+            delay(2000.milliseconds)
             resetMessage = false
         }
     }
@@ -248,16 +227,16 @@ private fun SquatCameraContent(onBack: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                cameraError ?: "MusclePlay needs camera access to detect your squats."
+                cameraError
+                    ?: "MusclePlay needs camera access to detect your push-ups."
             )
 
             Button(
                 onClick = {
                     cameraError = null
-                    permissionLauncher.launch(
-                        Manifest.permission.CAMERA
-                    )
-                }) {
+                    permissionLauncher.launch(Manifest.permission.CAMERA)
+                }
+            ) {
                 Text("Grant camera permission")
             }
 
@@ -265,62 +244,60 @@ private fun SquatCameraContent(onBack: () -> Unit) {
                 Text("Back")
             }
         }
-
         return
     }
 
     DisposableEffect(previewView, lifecycleOwner) {
         var poseHelper: PoseLandmarkerHelper? = null
         var cameraProvider: ProcessCameraProvider? = null
+        var disposed = false
 
         try {
             poseHelper = PoseLandmarkerHelper(
                 context = context.applicationContext,
-
-                onPoseDetected = { frame ->
+                onPoseDetected = { pose ->
                     mainHandler.post {
-                        if (frame == null) {
-                            poseStatus = NO_PERSON_WARNING
+                        if (disposed) return@post
 
-                            squatState = squatCounter.state.copy(
-                                kneeAngleDegrees = null,
-                                isPoseReliable = false
-                            )
+                        val updatedState = if (pose == null) {
+                            detector.onPoseLost()
                         } else {
-                            val updatedState = squatCounter.processFrame(frame)
+                            detector.processPose(pose)
+                        }
 
-                            squatState = updatedState
+                        exerciseState = updatedState
 
-                            poseStatus = when {
-                                !updatedState.isPoseReliable ->
-                                    LEGS_WARNING
+                        poseStatus = when {
+                            pose == null -> NO_PERSON_WARNING
+                            !updatedState.isPoseReliable -> ARMS_WARNING
+                            updatedState.phase == ExercisePhase.ACTIVE ->
+                                "Push-up detected — push back up to complete the rep"
 
-                                updatedState.phase == SquatPhase.SQUATTING ->
-                                    "Squat detected — stand up to complete the rep"
-
-                                else ->
-                                    "Pose detected — get ready to squat"
-                            }
+                            else ->
+                                updatedState.feedback
                         }
                     }
                 },
-
                 onError = { message ->
                     mainHandler.post {
-                        cameraError = message
+                        if (!disposed) cameraError = message
                     }
                 },
                 onLandmarksDetected = { landmarks ->
                     mainHandler.post {
-                        poseLandmarks = landmarks.orEmpty()
+                        if (!disposed) {
+                            poseLandmarks = landmarks.orEmpty()
+                        }
                     }
-                },
+                }
             )
 
             val providerFuture = ProcessCameraProvider.getInstance(context)
 
             providerFuture.addListener(
                 {
+                    if (disposed) return@addListener
+
                     try {
                         val provider = providerFuture.get()
                         cameraProvider = provider
@@ -329,24 +306,29 @@ private fun SquatCameraContent(onBack: () -> Unit) {
                             it.surfaceProvider = previewView.surfaceProvider
                         }
 
-                        val analysis = ImageAnalysis.Builder().setOutputImageFormat(
-                            ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888
-                        ).setBackpressureStrategy(
-                            ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
-                        ).build()
+                        val analysis = ImageAnalysis.Builder()
+                            .setOutputImageFormat(
+                                ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888
+                            )
+                            .setBackpressureStrategy(
+                                ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
+                            )
+                            .build()
 
                         analysis.setAnalyzer(analysisExecutor) { imageProxy ->
                             try {
                                 val bitmap = imageProxy.toRgbaBitmap()
-
                                 val mpImage = BitmapImageBuilder(bitmap).build()
 
-                                poseHelper.detect(
-                                    mpImage, SystemClock.uptimeMillis()
+                                poseHelper?.detect(
+                                    mpImage,
+                                    SystemClock.uptimeMillis()
                                 )
                             } catch (exception: Exception) {
                                 Log.e(
-                                    "SquatCamera", "Frame processing failed", exception
+                                    PUSH_UP_TAG,
+                                    "Frame processing failed",
+                                    exception
                                 )
                             } finally {
                                 imageProxy.close()
@@ -354,37 +336,42 @@ private fun SquatCameraContent(onBack: () -> Unit) {
                         }
 
                         provider.unbindAll()
-
                         provider.bindToLifecycle(
-                            lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis
+                            lifecycleOwner,
+                            CameraSelector.DEFAULT_FRONT_CAMERA,
+                            preview,
+                            analysis
                         )
                     } catch (exception: Exception) {
                         mainHandler.post {
-                            cameraError = exception.message ?: "Unable to start camera"
+                            if (!disposed) {
+                                cameraError =
+                                    exception.message ?: "Unable to start camera"
+                            }
                         }
                     }
-                }, ContextCompat.getMainExecutor(context)
+                },
+                ContextCompat.getMainExecutor(context)
             )
         } catch (exception: Exception) {
-            cameraError = exception.message ?: "Unable to initialize pose detection"
+            cameraError =
+                exception.message ?: "Unable to initialize pose detection"
         }
 
         onDispose {
+            disposed = true
             cameraProvider?.unbindAll()
             poseHelper?.close()
             analysisExecutor.shutdown()
         }
     }
 
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // Camera preview.
+    Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
-            factory = { previewView }, modifier = Modifier.fillMaxSize()
+            factory = { previewView },
+            modifier = Modifier.fillMaxSize()
         )
 
-        // Layer 2: Live MediaPipe skeleton
         if (isSkeletonVisible) {
             PoseSkeletonOverlay(
                 landmarks = poseLandmarks,
@@ -395,27 +382,31 @@ private fun SquatCameraContent(onBack: () -> Unit) {
                 skeletonColor = skeletonColor
             )
         }
-        // Reset-success popup.
-        // IMPORTANT: This must remain inside the Box.
+
         if (resetMessage) {
             Row(
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 100.dp).background(
-                    color = Color(0xEE163D2D), shape = RoundedCornerShape(12.dp)
-                ).border(
-                    width = 1.dp, color = Color(0xFF7CF5B4), shape = RoundedCornerShape(12.dp)
-                ).padding(
-                    horizontal = 16.dp, vertical = 12.dp
-                ),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 100.dp)
+                    .background(
+                        color = Color(0xEE163D2D),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = PushUpGreen,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "✓",
-                    color = Color(0xFF7CF5B4),
+                    color = PushUpGreen,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
-
                 Text(
                     text = "Reps reset successfully!",
                     color = Color.White,
@@ -425,26 +416,29 @@ private fun SquatCameraContent(onBack: () -> Unit) {
             }
         }
 
-        // Warning popup.
-        // Shown only after a warning persists for 800 ms.
         warningMessage?.let { message ->
             Row(
-                modifier = Modifier.align(Alignment.TopStart).padding(
-                    top = 8.dp, start = 8.dp, end = 100.dp
-                ).background(
-                    color = Color(0xEE332719), shape = RoundedCornerShape(12.dp)
-                ).border(
-                    width = 1.dp, color = Color(0xFFFFB74D), shape = RoundedCornerShape(12.dp)
-                ).padding(
-                    horizontal = 14.dp, vertical = 10.dp
-                ),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = 8.dp, start = 8.dp, end = 100.dp)
+                    .background(
+                        color = Color(0xEE332719),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = Color(0xFFFFB74D),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "⚠", color = Color(0xFFFFB74D), fontSize = 18.sp
+                    text = "⚠",
+                    color = Color(0xFFFFB74D),
+                    fontSize = 18.sp
                 )
-
                 Text(
                     text = message,
                     color = Color.White,
@@ -454,37 +448,39 @@ private fun SquatCameraContent(onBack: () -> Unit) {
             }
         }
 
-        // Always-visible reps counter at the top-right.
+        // Repetition counter and help button.
         Column(
-            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(
-                color = Color(0xFF101820), shape = RoundedCornerShape(18.dp)
-            ).padding(
-                horizontal = 24.dp, vertical = 12.dp
-            ), horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .background(
+                    color = PushUpDark,
+                    shape = RoundedCornerShape(18.dp)
+                )
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = "REPS",
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFFB8D8D0)
+                color = PushUpMuted
             )
 
             Text(
-                text = squatState.repetitions.toString(),
+                text = exerciseState.repetitions.toString(),
                 style = MaterialTheme.typography.headlineMedium,
-                color = Color(0xFF7CF5B4)
+                color = PushUpGreen
             )
 
             Spacer(modifier = Modifier.padding(top = 4.dp))
 
             Button(
-                onClick = {
-                    showSquatHelp = true
-                },
+                onClick = { showPushUpHelp = true },
                 modifier = Modifier.size(35.dp),
                 shape = CircleShape,
                 contentPadding = PaddingValues(0.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF34434E),
+                    containerColor = PushUpButton,
                     contentColor = Color.White
                 )
             ) {
@@ -495,74 +491,93 @@ private fun SquatCameraContent(onBack: () -> Unit) {
                 )
             }
         }
-        if (showSquatHelp) {
+
+        if (showPushUpHelp) {
+            // Uses the existing exercise-help content for push-ups.
             ExerciseHelpDialog(
-                content = ExerciseHelpContents.squat,
-                onDismiss = {
-                    showSquatHelp = false
-                }
+                content = ExerciseHelpContents.pushUp,
+                onDismiss = { showPushUpHelp = false }
             )
         }
-        // Bottom exercise Options panel.
+
+        // Bottom options panel, styled like the squat screen.
         if (isHudVisible) {
             Column(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(
-                    horizontal = 12.dp, vertical = 12.dp
-                ).background(
-                    color = Color(0xFF101820), shape = RoundedCornerShape(18.dp)
-                ).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
+                    .background(
+                        color = PushUpDark,
+                        shape = RoundedCornerShape(18.dp)
+                    )
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Knee angle.
+                Text(
+                    text = statusMessageForHud(exerciseState, poseStatus),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (exerciseState.isPoseReliable) PushUpGreen
+                    else PushUpYellow
+                )
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Knee angle",
+                        text = "Arm angle",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFFB8D8D0)
+                        color = PushUpMuted
                     )
-
-                    Text(text = squatState.kneeAngleDegrees?.let { "${it.toInt()}°" } ?: "--",
+                    Text(
+                        text = exerciseState.primaryAngleDegrees
+                            ?.let { "${it.toInt()}°" } ?: "--",
                         style = MaterialTheme.typography.titleLarge,
-                        color = Color.White)
+                        color = Color.White
+                    )
                 }
 
-                // Current squat phase.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Squat Phase",
+                        text = "Push-up Phase",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFFB8D8D0)
+                        color = PushUpMuted
                     )
-
                     Text(
-                        text = squatState.phase.name.replace('_', ' ').lowercase()
+                        text = exerciseState.phase.name
+                            .replace('_', ' ')
+                            .lowercase()
                             .replaceFirstChar { it.uppercase() },
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color(0xFF7CF5B4)
+                        color = PushUpGreen
                     )
                 }
 
+                cameraError?.let { error ->
+                    Text(
+                        text = error,
+                        color = PushUpRed,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
 
-                // Hide Options and Back buttons.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
-                        onClick = {
-                            isHudVisible = false
-                        },
+                        onClick = { isHudVisible = false },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF7CF5B4), contentColor = Color(0xFF101820)
+                            containerColor = PushUpGreen,
+                            contentColor = PushUpDark
                         )
                     ) {
                         Text("Hide Options")
@@ -573,7 +588,8 @@ private fun SquatCameraContent(onBack: () -> Unit) {
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF34434E), contentColor = Color.White
+                            containerColor = PushUpButton,
+                            contentColor = Color.White
                         )
                     ) {
                         Text("Back")
@@ -581,56 +597,49 @@ private fun SquatCameraContent(onBack: () -> Unit) {
                 }
 
                 Button(
-                    onClick = {
-                        isSkeletonVisible = !isSkeletonVisible
-                    },
+                    onClick = { isSkeletonVisible = !isSkeletonVisible },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF24313B),
+                        containerColor = PushUpPanel,
                         contentColor = Color.White
                     )
                 ) {
                     Text(
-                        text = if (isSkeletonVisible) {
-                            "Hide Skeleton"
-                        } else {
-                            "Show Skeleton"
-                        }
+                        if (isSkeletonVisible) "Hide Skeleton"
+                        else "Show Skeleton"
                     )
                 }
 
-                // Reset button.
                 Button(
                     onClick = {
-                        squatCounter.reset()
-                        squatState = squatCounter.state
-                        poseStatus = "Counter reset — stand upright to begin"
+                        exerciseState = detector.reset()
+                        poseStatus =
+                            "Counter reset — straighten your arms to begin"
                         cameraError = null
-
-                        // Show the success popup and restart its timer.
                         resetMessage = true
                         resetToastKey++
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF24313B), contentColor = Color.White
+                        containerColor = PushUpPanel,
+                        contentColor = Color.White
                     )
                 ) {
                     Text("Reset")
                 }
             }
         } else {
-            // Show Options when the panel is hidden.
             Button(
-                onClick = {
-                    isHudVisible = true
-                },
-                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                onClick = { isHudVisible = true },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF7CF5B4), contentColor = Color(0xFF101820)
+                    containerColor = PushUpGreen,
+                    contentColor = PushUpDark
                 )
             ) {
                 Text("Show Options")
@@ -639,19 +648,37 @@ private fun SquatCameraContent(onBack: () -> Unit) {
     }
 }
 
+private fun statusMessageForHud(
+    state: ExerciseState,
+    cameraStatus: String,
+): String {
+    return when (cameraStatus) {
+        NO_PERSON_WARNING -> NO_PERSON_WARNING
+        ARMS_WARNING -> ARMS_WARNING
+        else -> state.feedback
+    }
+}
+
 private fun ImageProxy.toRgbaBitmap(): Bitmap {
-    require(
-        format == android.graphics.ImageFormat.YUV_420_888 || planes.isNotEmpty()
-    ) {
+    require(planes.isNotEmpty()) {
         "Camera frame has no image planes"
     }
 
     val plane = planes[0]
-    val buffer = plane.buffer
+    val buffer = plane.buffer.duplicate()
     buffer.rewind()
 
-    val rowStride = plane.rowStride
-    val pixelStride = plane.pixelStride
+    val expectedRowBytes = width * 4
+
+    if (
+        plane.pixelStride == 4 &&
+        plane.rowStride == expectedRowBytes &&
+        buffer.remaining() >= height * expectedRowBytes
+    ) {
+        return createBitmap(width, height).apply {
+            copyPixelsFromBuffer(buffer)
+        }
+    }
 
     val rgba = ByteArray(buffer.remaining())
     buffer.get(rgba)
@@ -660,7 +687,7 @@ private fun ImageProxy.toRgbaBitmap(): Bitmap {
 
     for (y in 0 until height) {
         for (x in 0 until width) {
-            val index = y * rowStride + x * pixelStride
+            val index = y * plane.rowStride + x * plane.pixelStride
 
             if (index + 3 < rgba.size) {
                 val red = rgba[index].toInt() and 0xFF
@@ -668,14 +695,16 @@ private fun ImageProxy.toRgbaBitmap(): Bitmap {
                 val blue = rgba[index + 2].toInt() and 0xFF
                 val alpha = rgba[index + 3].toInt() and 0xFF
 
-                pixels[y * width + x] = (alpha shl 24) or (red shl 16) or (green shl 8) or blue
+                pixels[y * width + x] =
+                    (alpha shl 24) or
+                            (red shl 16) or
+                            (green shl 8) or
+                            blue
             }
         }
     }
 
     return createBitmap(width, height).apply {
-        setPixels(
-            pixels, 0, width, 0, 0, width, height
-        )
+        setPixels(pixels, 0, width, 0, 0, width, height)
     }
 }

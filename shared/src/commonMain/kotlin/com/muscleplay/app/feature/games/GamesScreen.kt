@@ -1,4 +1,3 @@
-
 package com.muscleplay.app.feature.games
 
 import androidx.compose.foundation.background
@@ -32,7 +31,7 @@ private data class FitnessGame(
     val description: String,
     val difficulty: String,
     val duration: String,
-    val emoji: String
+    val emoji: String,
 )
 
 private val fitnessGames = listOf(
@@ -53,18 +52,18 @@ private val fitnessGames = listOf(
         emoji = "🏋️"
     ),
     FitnessGame(
-        id = "pose_challenge",
-        title = "Pose Challenge",
-        description = "Get ready for movement tracking and pose-based challenges.",
+        id = "push_up_master",
+        title = "Push Up Master",
+        description = "Practice your push ups and work toward your target.",
         difficulty = "Intermediate",
         duration = "45 seconds",
-        emoji = "🧍"
+        emoji = "💪"
     )
 )
 
 @Composable
 fun GamesScreen(
-    onPlayGame: (String) -> Unit
+    onPlayGame: (String) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -131,7 +130,7 @@ fun GamesScreen(
 @Composable
 private fun FitnessGameCard(
     game: FitnessGame,
-    onPlay: () -> Unit
+    onPlay: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
