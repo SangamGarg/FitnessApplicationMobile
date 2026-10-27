@@ -489,20 +489,19 @@ private fun ExerciseCardItem(
                 }
             }
 
-            Button(
-                onClick = onClick,
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text("Start", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Start Active Session", tint = Color.White, modifier = Modifier.size(14.dp))
-                }
-            }
+//            Button(
+//                onClick = onClick,
+//                shape = RoundedCornerShape(12.dp),
+//                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary),
+//                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+//            ) {
+//                Row(
+//                    verticalAlignment = Alignment.CenterVertically,
+//                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+//                ) {
+//                    Icon(Icons.Default.PlayArrow, contentDescription = "Start Active Session", tint = Color.White, modifier = Modifier.size(14.dp))
+//                }
+//            }
         }
     }
 }

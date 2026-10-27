@@ -149,6 +149,13 @@ fun MusclePlayNavigation(
         Routes.PROFILE_AI_BOT
     )
     var isWorkoutSessionActive by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentRoute) {
+        if (currentRoute != Routes.WORKOUTS) {
+            isWorkoutSessionActive = false
+        }
+    }
+
     val shouldHideBottomBar =
         isWorkoutSessionActive || currentRoute in bottomBarHiddenRoutes || currentRoute?.startsWith(Routes.OTP_VERIFICATION) == true
 

@@ -1,6 +1,7 @@
 package com.muscleplay.app.feature.workout
 
 import androidx.compose.runtime.*
+import com.muscleplay.app.core.ui.BackHandler
 import com.muscleplay.app.feature.workout.model.*
 
 enum class WorkoutScreenState {
@@ -21,8 +22,31 @@ fun WorkoutScreen(
     var initialMode by remember { mutableStateOf(PlayerTrackingMode.MANUAL) }
     var summaryData by remember { mutableStateOf<WorkoutSummaryData?>(null) }
 
+    BackHandler(enabled = screenState != WorkoutScreenState.CATALOGUE) {
+        when (screenState) {
+            WorkoutScreenState.ACTIVE_PLAYER -> {
+                activeSession = null
+                screenState = WorkoutScreenState.CATALOGUE
+            }
+            WorkoutScreenState.SUMMARY -> {
+                summaryData = null
+                activeSession = null
+                screenState = WorkoutScreenState.CATALOGUE
+            }
+            WorkoutScreenState.CATALOGUE -> {
+                // Handled natively
+            }
+        }
+    }
+
     LaunchedEffect(screenState) {
         onActiveSessionStateChange(screenState != WorkoutScreenState.CATALOGUE)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            onActiveSessionStateChange(false)
+        }
     }
 
     when (screenState) {
