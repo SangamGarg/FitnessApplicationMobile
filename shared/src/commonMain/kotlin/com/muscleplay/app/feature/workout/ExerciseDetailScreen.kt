@@ -255,41 +255,45 @@ fun ExerciseDetailContent(
         }
 
         // Action Bar at Bottom
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Primary Start Active Session Button
+            Button(
+                onClick = onStartExerciseManual,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
             ) {
-                // Manual Start Button
-                Button(
-                    onClick = onStartExerciseManual,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
+                    Text("🚀 Start Active Session", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = Color.White)
+                }
+            }
+
+            // AI Camera Mode Button if supported
+            if (exercise.supportsAiTracking) {
+                OutlinedButton(
+                    onClick = onStartExerciseAi,
                     modifier = Modifier
-                        .weight(1f)
+                        .fillMaxWidth()
                         .height(50.dp),
                     shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, OrangeSecondary),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeSecondary)
                 ) {
-                    Text("Start Session", fontWeight = FontWeight.Bold, color = Color.White)
-                }
-
-                // AI Camera Mode Button if supported
-                if (exercise.supportsAiTracking) {
-                    OutlinedButton(
-                        onClick = onStartExerciseAi,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.5.dp, OrangeSecondary),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeSecondary)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Text("AI Camera", fontWeight = FontWeight.Bold)
-                        }
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = OrangeSecondary)
+                        Text("✨ Start with AI Camera Tracking", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                 }
             }

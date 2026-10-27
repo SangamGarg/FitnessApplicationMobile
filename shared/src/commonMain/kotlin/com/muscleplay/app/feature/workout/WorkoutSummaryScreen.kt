@@ -41,146 +41,184 @@ fun WorkoutSummaryScreen(
             .fillMaxSize()
             .background(DarkBackground)
     ) {
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(top = 24.dp, bottom = 80.dp)
         ) {
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Surface(
-                color = OrangePrimary.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(20.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.5f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+            // Header Badge
+            item {
+                Surface(
+                    color = OrangePrimary.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(20.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.5f))
                 ) {
-                    Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = OrangeSecondary, modifier = Modifier.size(16.dp))
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = OrangeSecondary, modifier = Modifier.size(16.dp))
+                        Text(
+                            text = "WORKOUT COMPLETED 🎉",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = OrangeSecondary,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 1.2.sp
+                        )
+                    }
+                }
+            }
+
+            // Title & Subtitle
+            item {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "WORKOUT COMPLETED 🎉",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = OrangeSecondary,
+                        text = "Great Job, MusclePlay Athlete!",
+                        style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 1.2.sp
+                        color = Color.White
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Here is your overall session performance summary.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.7f)
                     )
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            // Stat Cards Grid
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        MetricHighlightCard(
+                            title = "DURATION",
+                            value = durationText,
+                            icon = Icons.Default.Timer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetricHighlightCard(
+                            title = "VOLUME",
+                            value = "${summary.totalVolumeKg.toInt()} kg",
+                            icon = Icons.Default.FitnessCenter,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
 
-            Text(
-                text = "Great Job, MusclePlay Athlete!",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White
-            )
-
-            Spacer(Modifier.height(4.dp))
-
-            Text(
-                text = "Here is your overall session performance summary.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.7f)
-            )
-
-            Spacer(Modifier.height(20.dp))
-
-            // Stat Cards Grid (4 Key Highlights)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                MetricHighlightCard(
-                    title = "DURATION",
-                    value = durationText,
-                    icon = Icons.Default.Timer,
-                    modifier = Modifier.weight(1f)
-                )
-                MetricHighlightCard(
-                    title = "VOLUME",
-                    value = "${summary.totalVolumeKg.toInt()} kg",
-                    icon = Icons.Default.FitnessCenter,
-                    modifier = Modifier.weight(1f)
-                )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        MetricHighlightCard(
+                            title = "TOTAL REPS",
+                            value = "${summary.totalReps}",
+                            icon = Icons.Default.FitnessCenter,
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetricHighlightCard(
+                            title = "SETS DONE",
+                            value = "${summary.completedSetsCount} / ${summary.totalSetsCount}",
+                            icon = Icons.Default.CheckCircle,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
             }
 
-            Spacer(Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                MetricHighlightCard(
-                    title = "TOTAL REPS",
-                    value = "${summary.totalReps}",
-                    icon = Icons.Default.FitnessCenter,
-                    modifier = Modifier.weight(1f)
-                )
-                MetricHighlightCard(
-                    title = "SETS DONE",
-                    value = "${summary.completedSetsCount} / ${summary.totalSetsCount}",
-                    icon = Icons.Default.CheckCircle,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            Text(
-                text = "Exercise & Set Breakdown",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = OrangeSecondary,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(10.dp))
-
-            LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(summary.exercises, key = { it.exercise.id }) { sessionEx ->
-                    GlassSummaryCardContainer {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
+            // Targeted Muscle Recovery Impact Card
+            item {
+                GlassSummaryCardContainer {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
-                                text = sessionEx.exercise.name,
+                                text = "Targeted Muscle Strain",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
                             )
+                            Text(
+                                text = "Chest & Triceps updated to High Strain 🔥",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                        }
+                        Surface(
+                            color = OrangePrimary.copy(alpha = 0.25f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = "Heatmap Updated",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = OrangeSecondary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
 
-                            sessionEx.sets.forEach { setLog ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+            // Exercise Breakdown Section Header
+            item {
+                Text(
+                    text = "Exercise & Set Breakdown",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = OrangeSecondary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Exercise & Sets Items
+            items(summary.exercises, key = { it.exercise.id }) { sessionEx ->
+                GlassSummaryCardContainer {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = sessionEx.exercise.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+
+                        sessionEx.sets.forEach { setLog ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Set ${setLog.setNumber}: ${setLog.actualWeightKg} kg × ${setLog.actualReps} reps",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.White.copy(alpha = 0.85f)
+                                )
+
+                                Surface(
+                                    color = if (setLog.isCompleted) Color(0xFF4CAF50).copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text(
-                                        text = "Set ${setLog.setNumber}: ${setLog.actualWeightKg} kg × ${setLog.actualReps} reps",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color.White.copy(alpha = 0.85f)
+                                        text = if (setLog.isCompleted) "Completed ✓" else "Skipped",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (setLog.isCompleted) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.6f),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                     )
-
-                                    Surface(
-                                        color = if (setLog.isCompleted) Color(0xFF4CAF50).copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Text(
-                                            text = if (setLog.isCompleted) "Completed ✓" else "Skipped",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (setLog.isCompleted) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.6f),
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -188,20 +226,20 @@ fun WorkoutSummaryScreen(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
-
-            Button(
-                onClick = onDone,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
-            ) {
-                Text("Save & Return to Home 🏠", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+            // Save & Return Home Button (Inside scroll list for guaranteed visibility)
+            item {
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = onDone,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                ) {
+                    Text("Save & Return to Home 🏠", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                }
             }
-
-            Spacer(Modifier.height(12.dp))
         }
     }
 }

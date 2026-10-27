@@ -1,30 +1,64 @@
 package com.muscleplay.app.feature.workout
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.muscleplay.app.feature.workout.components.LiveMetronomeBar
 import com.muscleplay.app.feature.workout.model.ActiveWorkoutSession
+import com.muscleplay.app.feature.workout.model.CoachPersona
 import com.muscleplay.app.feature.workout.model.SetLog
 import com.muscleplay.app.feature.workout.model.WorkoutSummaryData
 import kotlinx.coroutines.delay
@@ -49,6 +83,10 @@ fun WorkoutPlayerScreen(
     var trackingMode by remember { mutableStateOf(initialTrackingMode) }
     var elapsedSeconds by remember { mutableLongStateOf(0L) }
     var isPaused by remember { mutableStateOf(false) }
+
+    // Voice Coach & Metronome State
+    var isVoiceMuted by remember { mutableStateOf(false) }
+    var activePersona by remember { mutableStateOf(CoachPersona.MOTIVATIONAL) }
 
     // Rest Timer State
     var showRestTimerSheet by remember { mutableStateOf(false) }
@@ -101,7 +139,7 @@ fun WorkoutPlayerScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Top Bar: Timer, Progress & Finish/Cancel Actions
+            // Sticky Top Bar: Timer, Progress & Finish/Cancel Actions
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -168,125 +206,130 @@ fun WorkoutPlayerScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Session Progress Bar
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Session Progress",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.6f)
-                    )
-                    Text(
-                        text = "$completedSets / $totalSets Sets Completed",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = OrangeSecondary,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                LinearProgressIndicator(
-                    progress = { progressFraction },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    color = OrangePrimary,
-                    trackColor = Color.White.copy(alpha = 0.1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Current Exercise Title Header
-            if (currentExercise != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = currentExercise.exercise.name,
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Target: ${currentExercise.exercise.defaultSets} Sets × ${currentExercise.exercise.defaultTargetReps} Reps",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = OrangeSecondary
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Mode Toggle Switch (Segmented Control: Manual vs AI Tracker)
-            Row(
+            // Scrollable Active Session Body
+            LazyColumn(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color.White.copy(alpha = 0.08f))
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    .fillMaxSize()
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = PaddingValues(bottom = 60.dp)
             ) {
-                // Manual Mode Option
-                Surface(
-                    onClick = { trackingMode = PlayerTrackingMode.MANUAL },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (trackingMode == PlayerTrackingMode.MANUAL) OrangePrimary else Color.Transparent
-                ) {
-                    Box(
-                        modifier = Modifier.padding(vertical = 10.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
+                // Session Progress Bar
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(Icons.Default.EditNote, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            Text("Manual Set Logger", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                            Text(
+                                text = "Session Progress",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.6f)
+                            )
+                            Text(
+                                text = "$completedSets / $totalSets Sets Completed",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = OrangeSecondary,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
+
+                        LinearProgressIndicator(
+                            progress = { progressFraction },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = OrangePrimary,
+                            trackColor = Color.White.copy(alpha = 0.1f)
+                        )
                     }
                 }
 
-                // AI Tracker Mode Option
-                Surface(
-                    onClick = { trackingMode = PlayerTrackingMode.AI_TRACKER },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (trackingMode == PlayerTrackingMode.AI_TRACKER) OrangePrimary else Color.Transparent
-                ) {
-                    Box(
-                        modifier = Modifier.padding(vertical = 10.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            Text("AI Camera Tracker", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Main Content Area based on Tracking Mode
-            if (trackingMode == PlayerTrackingMode.MANUAL) {
-                // Manual Set Logger Table View
+                // Current Exercise Title Header
                 if (currentExercise != null) {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.weight(1f)
+                    item {
+                        Column {
+                            Text(
+                                text = currentExercise.exercise.name,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Target: ${currentExercise.exercise.defaultSets} Sets × ${currentExercise.exercise.defaultTargetReps} Reps",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = OrangeSecondary
+                            )
+                        }
+                    }
+                }
+
+                // AI Live Voice Coach & Haptic Pace Metronome Bar
+                item {
+                    LiveMetronomeBar(
+                        isMuted = isVoiceMuted,
+                        selectedPersona = activePersona,
+                        onToggleMute = { isVoiceMuted = !isVoiceMuted },
+                        onSelectPersona = { activePersona = it }
+                    )
+                }
+
+                // Mode Toggle Switch
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                        Surface(
+                            onClick = { trackingMode = PlayerTrackingMode.MANUAL },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (trackingMode == PlayerTrackingMode.MANUAL) OrangePrimary else Color.Transparent
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Default.EditNote, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    Text("Manual Set Logger", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                                }
+                            }
+                        }
+
+                        Surface(
+                            onClick = { trackingMode = PlayerTrackingMode.AI_TRACKER },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (trackingMode == PlayerTrackingMode.AI_TRACKER) OrangePrimary else Color.Transparent
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    Text("AI Camera Tracker", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Main Content Items (Sets or AI Camera Viewfinder)
+                if (trackingMode == PlayerTrackingMode.MANUAL) {
+                    if (currentExercise != null) {
                         itemsIndexed(currentExercise.sets) { _, setLog ->
                             ManualSetRowCard(
                                 setLog = setLog,
@@ -300,134 +343,128 @@ fun WorkoutPlayerScreen(
                             )
                         }
                     }
-                }
-            } else {
-                // AI Tracker Camera Viewfinder Mock
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(Color.Black.copy(alpha = 0.9f))
-                            .border(1.5.dp, OrangePrimary.copy(alpha = 0.5f), RoundedCornerShape(24.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // Dashed Reticle Guidelines Canvas
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val stroke = Stroke(
-                                width = 3f,
-                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 15f), 0f)
-                            )
-                            drawRect(
-                                color = OrangePrimary.copy(alpha = 0.4f),
-                                style = stroke
-                            )
-                        }
-
-                        // Live Rep Counter & Feedback Overlay
+                } else {
+                    item {
                         Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(14.dp),
-                            modifier = Modifier.padding(20.dp)
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            // Pose Tracking Active Badge
-                            Surface(
-                                color = Color.Black.copy(alpha = 0.6f),
-                                shape = RoundedCornerShape(16.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF4CAF50))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(300.dp)
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(Color.Black.copy(alpha = 0.9f))
+                                    .border(1.5.dp, OrangePrimary.copy(alpha = 0.5f), RoundedCornerShape(24.dp)),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(0xFF4CAF50))
+                                Canvas(modifier = Modifier.fillMaxSize()) {
+                                    val stroke = Stroke(
+                                        width = 3f,
+                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 15f), 0f)
                                     )
-                                    Text(
-                                        text = "Pose Tracking: Active ($aiConfidenceScore% Confidence)",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFF4CAF50),
-                                        fontWeight = FontWeight.Bold
+                                    drawRect(
+                                        color = OrangePrimary.copy(alpha = 0.4f),
+                                        style = stroke
                                     )
                                 }
-                            }
 
-                            // Large Live Rep Counter Display
-                            Text(
-                                text = "$aiLiveReps",
-                                fontSize = 72.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "COMPLETED REPS",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = OrangeSecondary,
-                                letterSpacing = 2.sp
-                            )
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                                    modifier = Modifier.padding(20.dp)
+                                ) {
+                                    Surface(
+                                        color = Color.Black.copy(alpha = 0.6f),
+                                        shape = RoundedCornerShape(16.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF4CAF50))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFF4CAF50))
+                                            )
+                                            Text(
+                                                text = "Pose Tracking: Active ($aiConfidenceScore% Confidence)",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color(0xFF4CAF50),
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
 
-                            // Form / Pacing Feedback Banner
-                            Surface(
-                                color = OrangePrimary.copy(alpha = 0.25f),
-                                shape = RoundedCornerShape(16.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary)
-                            ) {
-                                Text(
-                                    text = "💡 $aiFeedbackMessage",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-                                )
-                            }
-                        }
-                    }
+                                    Text(
+                                        text = "$aiLiveReps",
+                                        fontSize = 72.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = "COMPLETED REPS",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = OrangeSecondary,
+                                        letterSpacing = 2.sp
+                                    )
 
-                    // Simulate AI Rep Demo Button
-                    Button(
-                        onClick = {
-                            aiLiveReps++
-                            val feedbacks = listOf(
-                                "Good Depth!",
-                                "Keep chest up!",
-                                "Slow down on descent",
-                                "Perfect Form 🔥",
-                                "Drive through heels!"
-                            )
-                            aiFeedbackMessage = feedbacks.random()
-                            if (currentExercise != null) {
-                                val incompleteSet = currentExercise.sets.firstOrNull { !it.isCompleted }
-                                incompleteSet?.let {
-                                    it.actualReps = aiLiveReps
-                                    if (aiLiveReps >= it.targetReps) {
-                                        it.isCompleted = true
-                                        restTimerSeconds = 60
-                                        showRestTimerSheet = true
+                                    Surface(
+                                        color = OrangePrimary.copy(alpha = 0.25f),
+                                        shape = RoundedCornerShape(16.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary)
+                                    ) {
+                                        Text(
+                                            text = "💡 $aiFeedbackMessage",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                                        )
                                     }
                                 }
                             }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(Icons.Default.AddCircle, contentDescription = null, tint = Color.White)
-                            Text("Simulate AI Rep (+1)", fontWeight = FontWeight.Bold, color = Color.White)
+
+                            Button(
+                                onClick = {
+                                    aiLiveReps++
+                                    val feedbacks = listOf(
+                                        "Good Depth!",
+                                        "Keep chest up!",
+                                        "Slow down on descent",
+                                        "Perfect Form 🔥",
+                                        "Drive through heels!"
+                                    )
+                                    aiFeedbackMessage = feedbacks.random()
+                                    if (currentExercise != null) {
+                                        val incompleteSet = currentExercise.sets.firstOrNull { !it.isCompleted }
+                                        incompleteSet?.let {
+                                            it.actualReps = aiLiveReps
+                                            if (aiLiveReps >= it.targetReps) {
+                                                it.isCompleted = true
+                                                restTimerSeconds = 60
+                                                showRestTimerSheet = true
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(50.dp),
+                                shape = RoundedCornerShape(18.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.AddCircle, contentDescription = null, tint = Color.White)
+                                    Text("Simulate AI Rep (+1)", fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
                         }
                     }
                 }

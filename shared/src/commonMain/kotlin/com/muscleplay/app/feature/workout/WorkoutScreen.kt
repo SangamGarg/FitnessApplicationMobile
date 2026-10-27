@@ -12,6 +12,7 @@ enum class WorkoutScreenState {
 @Composable
 fun WorkoutScreen(
     repository: WorkoutRepository? = null,
+    onActiveSessionStateChange: (Boolean) -> Unit = {},
     onDone: () -> Unit = {}
 ) {
     var screenState by remember { mutableStateOf(WorkoutScreenState.CATALOGUE) }
@@ -19,6 +20,10 @@ fun WorkoutScreen(
     var activeSession by remember { mutableStateOf<ActiveWorkoutSession?>(null) }
     var initialMode by remember { mutableStateOf(PlayerTrackingMode.MANUAL) }
     var summaryData by remember { mutableStateOf<WorkoutSummaryData?>(null) }
+
+    LaunchedEffect(screenState) {
+        onActiveSessionStateChange(screenState != WorkoutScreenState.CATALOGUE)
+    }
 
     when (screenState) {
         WorkoutScreenState.CATALOGUE -> {

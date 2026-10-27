@@ -148,8 +148,9 @@ fun MusclePlayNavigation(
         Routes.PROFILE_EMAIL_SUPPORT,
         Routes.PROFILE_AI_BOT
     )
+    var isWorkoutSessionActive by remember { mutableStateOf(false) }
     val shouldHideBottomBar =
-        currentRoute in bottomBarHiddenRoutes || currentRoute?.startsWith(Routes.OTP_VERIFICATION) == true
+        isWorkoutSessionActive || currentRoute in bottomBarHiddenRoutes || currentRoute?.startsWith(Routes.OTP_VERIFICATION) == true
 
     val selectedIndex = remember(currentDestination) {
         val activeRoute = tabs.firstOrNull { tab ->
@@ -209,10 +210,9 @@ fun MusclePlayNavigation(
                 SplashScreen(
                     onSplashFinished = {
                         val destination = if (onboardingPreferences.isOnboardingCompleted()) {
-                            Routes.SIGN_IN
-
                             //TODO
-                            //    Routes.HOME
+                            //Routes.SIGN_IN
+                            Routes.HOME
                         } else {
                             Routes.ONBOARDING
                         }
@@ -301,7 +301,10 @@ fun MusclePlayNavigation(
             }
             composable(Routes.WORKOUTS) {
                 WorkoutScreen(
-                    repository = appContainer.workoutRepository
+                    repository = appContainer.workoutRepository,
+                    onActiveSessionStateChange = { isActive ->
+                        isWorkoutSessionActive = isActive
+                    }
                 )
             }
             composable(Routes.GAMES) {

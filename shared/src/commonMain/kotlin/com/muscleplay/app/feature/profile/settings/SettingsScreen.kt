@@ -104,6 +104,20 @@ fun SettingsScreen(
                                 checked = soundCuesEnabled,
                                 onCheckedChange = { soundCuesEnabled = it }
                             )
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                            SettingClickRow(
+                                icon = Icons.Default.RecordVoiceOver,
+                                title = "AI Voice Persona",
+                                subtitle = "Motivational Coach 💪",
+                                onClick = {}
+                            )
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                            SettingClickRow(
+                                icon = Icons.Default.GraphicEq,
+                                title = "Haptic Pace Metronome",
+                                subtitle = "2s Down • 1s Hold • 1s Up",
+                                onClick = {}
+                            )
                         }
                     }
                 }
