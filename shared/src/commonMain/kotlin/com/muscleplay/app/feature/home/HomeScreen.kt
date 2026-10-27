@@ -1,5 +1,6 @@
 package com.muscleplay.app.feature.home
 
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -41,14 +42,21 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
-// Vibrant Orange Theme Palette for Glassmorphism
-private val OrangePrimary = Color(0xFFFF5722) // Energetic Vibrant Orange
-private val OrangeSecondary = Color(0xFFFF9800) // Warm Amber Orange
-private val OrangeGlow = Color(0xFFFF3D00) // Glowing Deep Orange
-private val DarkBackground = Color(0xFF0F0F17) // Deep Obsidian Midnight
+private val OrangePrimary = Color(0xFFFF5722)
+private val OrangeSecondary = Color(0xFFFF9800)
+private val OrangeGlow = Color(0xFFFF3D00)
+private val DarkBackground = Color(0xFF0F0F17)
 
-// Height of the "DAILY GOAL PROGRESS / Active & Moving / 78%" row inside the activity card
 private val ActivityHeaderRowHeight = 40.dp
+
+data class DayStreakInfo(
+    val dayName: String,
+    val dateNum: Int,
+    val isCompleted: Boolean,
+    val isToday: Boolean,
+    val caloriesBurned: Int,
+    val stepsTaken: Int,
+)
 
 @Composable
 fun HomeScreen(
@@ -56,9 +64,10 @@ fun HomeScreen(
     onNavigateToWorkouts: () -> Unit = {},
     onNavigateToGames: () -> Unit = {},
     onNavigateToCalculators: () -> Unit = {},
-    onNavigateToProfile: () -> Unit = {}
+    onNavigateToProfile: () -> Unit = {},
+    onNavigateToScanner: () -> Unit = {},
+    onNavigateToCoinsHub: () -> Unit = {},
 ) {
-    // Ambient glowing pulse animation
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.9f,
@@ -80,7 +89,9 @@ fun HomeScreen(
         label = "pulseAlpha"
     )
 
-    // ---- Collapsing top section (header + activity card) ----
+    var currentWaterMl by remember { mutableIntStateOf(1750) }
+    var isFabMenuExpanded by remember { mutableStateOf(false) }
+
     val density = LocalDensity.current
     val expandedCardHeight = 240.dp
     val collapsedCardHeight = 92.dp
@@ -90,19 +101,15 @@ fun HomeScreen(
     val cardRangePx = with(density) { (expandedCardHeight - collapsedCardHeight).toPx() }
     val spacingPx = with(density) { headerCardSpacing.toPx() }
 
-    // Header block = top padding + greeting header + gap to the card (measured at runtime)
     var headerBlockPx by remember { mutableFloatStateOf(with(density) { 160.dp.toPx() }) }
 
-    // Scroll budget: first the greeting header slides away, then the card shrinks
     val totalRangePx = headerBlockPx + cardRangePx
     val currentTotalRange by rememberUpdatedState(totalRangePx)
 
-    // 0f = fully expanded, totalRangePx = header gone + card fully collapsed
     var collapsedPx by remember { mutableFloatStateOf(0f) }
 
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
-            // Scrolling DOWN the page (finger moves up): collapse the top section first
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 val delta = available.y
                 if (delta >= 0f) return Offset.Zero
@@ -111,11 +118,10 @@ fun HomeScreen(
                 return Offset(0f, -(collapsedPx - old))
             }
 
-            // Scrolling back UP: the list reaches its top first, then the top section expands
             override fun onPostScroll(
                 consumed: Offset,
                 available: Offset,
-                source: NestedScrollSource
+                source: NestedScrollSource,
             ): Offset {
                 val delta = available.y
                 if (delta <= 0f) return Offset.Zero
@@ -139,12 +145,10 @@ fun HomeScreen(
             .fillMaxSize()
             .background(DarkBackground)
     ) {
-        // Glowing Background Orbs for Glassmorphic Depth Effect
         Canvas(modifier = Modifier.fillMaxSize()) {
             val canvasWidth = size.width
             val canvasHeight = size.height
 
-            // Top-right Orange Glow Orb
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(OrangeGlow.copy(alpha = pulseAlpha), Color.Transparent),
@@ -155,10 +159,12 @@ fun HomeScreen(
                 radius = canvasWidth * 0.7f * pulseScale
             )
 
-            // Bottom-left Amber Glow Orb
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(OrangeSecondary.copy(alpha = pulseAlpha * 0.7f), Color.Transparent),
+                    colors = listOf(
+                        OrangeSecondary.copy(alpha = pulseAlpha * 0.7f),
+                        Color.Transparent
+                    ),
                     center = Offset(canvasWidth * 0.15f, canvasHeight * 0.75f),
                     radius = canvasWidth * 0.6f
                 ),
@@ -173,7 +179,6 @@ fun HomeScreen(
                 .padding(horizontal = 20.dp)
                 .nestedScroll(nestedScrollConnection)
         ) {
-            // Top section: greeting header slides away, activity card shrinks and stays pinned
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -186,7 +191,6 @@ fun HomeScreen(
                         .wrapContentHeight(Alignment.Top, unbounded = true)
                         .offset { IntOffset(0, -headerShiftPx.roundToInt()) }
                 ) {
-                    // Header Section
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -200,7 +204,6 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(headerCardSpacing))
 
-                    // Daily Activity Rings Card (collapsible)
                     GlassActivityCard(
                         collapseProgress = cardCollapseProgress,
                         expandedHeight = expandedCardHeight,
@@ -209,27 +212,55 @@ fun HomeScreen(
                 }
             }
 
-            // Scrollable Home Screen View
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-                contentPadding = PaddingValues(top = 20.dp, bottom = 90.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp)
             ) {
-                // Muscle Recovery Status Card
+                // 1. Dynamic 7-Day Streak Calendar Row
+                item {
+                    GlassStreakCalendarRow()
+                }
+
+                // 2. Quick-Log Glass Hydration Tracker Card
+                item {
+                    GlassHydrationCard(
+                        currentWaterMl = currentWaterMl,
+                        onAddWater = { ml ->
+                            currentWaterMl = (currentWaterMl + ml).coerceAtMost(4000)
+                        }
+                    )
+                }
+
+                // 3. Smart AI Coach Daily Insight & Recommendation Card
+                item {
+                    GlassAiCoachInsightCard(
+                        onStartWorkout = onNavigateToWorkouts
+                    )
+                }
+
+                // 4. 3D Muscle Recovery Heatmap Summary Card
                 item {
                     GlassMuscleRecoveryCard(
                         onOpenHeatmap = onNavigateToWorkouts
                     )
                 }
 
-                // Featured Workout Card
+                // 5. Featured Workout Card
                 item {
                     GlassFeaturedWorkoutCard(
                         onStartWorkout = onNavigateToWorkouts
                     )
                 }
 
-                // Explore Quick Actions Grid
+                // 6. Daily MP Coin Challenge & Leaderboard Preview
+                item {
+                    GlassDailyCoinChallengeCard(
+                        onEnterChallenge = onNavigateToGames
+                    )
+                }
+
+                // 7. Explore & Play Quick Actions Grid
                 item {
                     Text(
                         text = "Explore & Play",
@@ -296,12 +327,660 @@ fun HomeScreen(
                 }
             }
         }
+
+        // Speed-Logging Glass Floating Hub (FAB)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 90.dp, end = 20.dp)
+        ) {
+            GlassFloatingActionHub(
+                isExpanded = isFabMenuExpanded,
+                onToggleExpand = { isFabMenuExpanded = !isFabMenuExpanded },
+                onNavigateToScanner = {
+                    isFabMenuExpanded = false
+                    onNavigateToScanner()
+                },
+                onAddWaterQuick = {
+                    currentWaterMl = (currentWaterMl + 250).coerceAtMost(4000)
+                    isFabMenuExpanded = false
+                },
+                onNavigateToCoinsHub = {
+                    isFabMenuExpanded = false
+                    onNavigateToCoinsHub()
+                }
+            )
+        }
+    }
+}
+
+// 1. Dynamic 7-Day Streak Calendar Row Component (Fixes Image 1)
+@Composable
+private fun GlassStreakCalendarRow() {
+    var selectedDayInfo by remember { mutableStateOf<DayStreakInfo?>(null) }
+
+    val daysList = remember {
+        listOf(
+            DayStreakInfo(
+                "Mon",
+                13,
+                isCompleted = true,
+                isToday = false,
+                caloriesBurned = 450,
+                stepsTaken = 7200
+            ),
+            DayStreakInfo(
+                "Tue",
+                14,
+                isCompleted = true,
+                isToday = false,
+                caloriesBurned = 510,
+                stepsTaken = 8100
+            ),
+            DayStreakInfo(
+                "Wed",
+                15,
+                isCompleted = true,
+                isToday = false,
+                caloriesBurned = 380,
+                stepsTaken = 6400
+            ),
+            DayStreakInfo(
+                "Thu",
+                16,
+                isCompleted = true,
+                isToday = false,
+                caloriesBurned = 420,
+                stepsTaken = 6420
+            ),
+            DayStreakInfo(
+                "Fri",
+                17,
+                isCompleted = true,
+                isToday = true,
+                caloriesBurned = 420,
+                stepsTaken = 6420
+            ),
+            DayStreakInfo(
+                "Sat",
+                18,
+                isCompleted = false,
+                isToday = false,
+                caloriesBurned = 0,
+                stepsTaken = 0
+            ),
+            DayStreakInfo(
+                "Sun",
+                19,
+                isCompleted = false,
+                isToday = false,
+                caloriesBurned = 0,
+                stepsTaken = 0
+            )
+        )
+    }
+
+    GlassContainer(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(OrangePrimary.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.LocalFireDepartment,
+                            contentDescription = null,
+                            tint = OrangeSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            "ACTIVE STREAK",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = OrangePrimary,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            "12 Days & Counting 🔥",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
+                            maxLines = 1
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                Surface(
+                    color = OrangeSecondary.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        "2 Freezes ❄️",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = OrangeSecondary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        maxLines = 1
+                    )
+                }
+            }
+
+            // 7 Days Grid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                daysList.forEach { day ->
+                    Surface(
+                        onClick = { selectedDayInfo = day },
+                        color = when {
+                            day.isToday -> OrangePrimary
+                            day.isCompleted -> Color.White.copy(alpha = 0.12f)
+                            else -> Color.White.copy(alpha = 0.04f)
+                        },
+                        shape = RoundedCornerShape(14.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (day.isToday) OrangeSecondary else if (day.isCompleted) OrangePrimary.copy(
+                                alpha = 0.4f
+                            ) else Color.White.copy(alpha = 0.1f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(vertical = 6.dp, horizontal = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                day.dayName,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (day.isToday) Color.White else Color.White.copy(alpha = 0.6f),
+                                fontSize = 10.sp
+                            )
+                            Text(
+                                "${day.dateNum}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White,
+                                fontSize = 13.sp
+                            )
+                            Icon(
+                                imageVector = if (day.isCompleted) Icons.Default.LocalFireDepartment else Icons.Default.Circle,
+                                contentDescription = null,
+                                tint = if (day.isCompleted) (if (day.isToday) Color.White else OrangeSecondary) else Color.White.copy(
+                                    alpha = 0.2f
+                                ),
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    selectedDayInfo?.let { info ->
+        AlertDialog(
+            onDismissRequest = { selectedDayInfo = null },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color(0xFF181824),
+            icon = {
+                Icon(
+                    Icons.Default.LocalFireDepartment,
+                    contentDescription = null,
+                    tint = OrangeSecondary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    "${info.dayName}, ${info.dateNum} Summary",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Burned Calories: ${info.caloriesBurned} kcal", color = Color.White)
+                    Text("Steps Recorded: ${info.stepsTaken} steps", color = Color.White)
+                    Text(
+                        "Status: ${if (info.isCompleted) "Completed 🔥" else "Rest Day"}",
+                        fontWeight = FontWeight.Bold,
+                        color = OrangeSecondary
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { selectedDayInfo = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                ) {
+                    Text("Close", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+}
+
+// 2. Quick-Log Glass Hydration Tracker (Fixes Image 2)
+@Composable
+private fun GlassHydrationCard(
+    currentWaterMl: Int,
+    onAddWater: (Int) -> Unit,
+) {
+    val targetWaterMl = 3000
+    val progressFraction = (currentWaterMl.toFloat() / targetWaterMl).coerceIn(0f, 1f)
+
+    GlassContainer(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF2196F3).copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.WaterDrop,
+                            contentDescription = null,
+                            tint = Color(0xFF2196F3),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Text(
+                        text = "HYDRATION TRACKER",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF2196F3),
+                        letterSpacing = 1.2.sp,
+                        maxLines = 1
+                    )
+                }
+
+                Text(
+                    text = "${(currentWaterMl / 1000.0).toString().take(3)}L / 3.0L Target",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    maxLines = 1
+                )
+            }
+
+            LinearProgressIndicator(
+                progress = { progressFraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = Color(0xFF2196F3),
+                trackColor = Color.White.copy(alpha = 0.1f)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { onAddWater(250) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2196F3).copy(
+                                alpha = 0.25f
+                            )
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            "+250ml",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
+                    Button(
+                        onClick = { onAddWater(500) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            "+500ml",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 3. Smart AI Coach Daily Insight Card (Fixes Image 3)
+@Composable
+private fun GlassAiCoachInsightCard(
+    onStartWorkout: () -> Unit,
+) {
+    GlassContainer(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.SmartToy,
+                        contentDescription = null,
+                        tint = OrangeSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "AI COACH DAILY INSIGHT",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = OrangeSecondary,
+                        letterSpacing = 1.sp,
+                        maxLines = 1
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Surface(
+                    color = Color(0xFF4CAF50).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "100% Legs Fresh",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4CAF50),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        maxLines = 1
+                    )
+                }
+            }
+
+            Text(
+                text = "💡 Your Legs & Quads are 100% recovered today! Ideal time for the Lower Body & Squat Blitz challenge.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.9f),
+                lineHeight = 20.sp
+            )
+
+            Button(
+                onClick = onStartWorkout,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary),
+                modifier = Modifier.fillMaxWidth().height(44.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        "Start Recommended Workout",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = Color.White
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// 4. Daily MP Coin Challenge & Leaderboard Preview Card (Fixes Image 4)
+@Composable
+private fun GlassDailyCoinChallengeCard(
+    onEnterChallenge: () -> Unit,
+) {
+    GlassContainer(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.EmojiEvents,
+                        contentDescription = null,
+                        tint = OrangeSecondary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Text(
+                        "DAILY MP COIN CHALLENGE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = OrangePrimary,
+                        letterSpacing = 1.sp,
+                        maxLines = 1
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Surface(
+                    color = OrangeSecondary,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        "+50 MP Reward",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        maxLines = 1
+                    )
+                }
+            }
+
+            Text(
+                "🔥 30 Push-Ups Liveness Challenge",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
+            )
+
+            // Mini Leaderboard Preview Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                LeaderboardBadge("🥇 Rahul S.", "150 MP", Modifier.weight(1f))
+                LeaderboardBadge("🥈 Priya K.", "120 MP", Modifier.weight(1f))
+                LeaderboardBadge("🥉 Alex F.", "90 MP", Modifier.weight(1f))
+            }
+
+            Button(
+                onClick = onEnterChallenge,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary),
+                modifier = Modifier.fillMaxWidth().height(44.dp)
+            ) {
+                Text("Enter Challenge ▶", fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LeaderboardBadge(name: String, score: String, modifier: Modifier = Modifier) {
+    Surface(
+        color = Color.White.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(10.dp),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                name,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1
+            )
+            Text(
+                score,
+                style = MaterialTheme.typography.labelSmall,
+                color = OrangeSecondary,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+// 5. Speed-Logging Glass Floating Hub (FAB)
+@Composable
+private fun GlassFloatingActionHub(
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onNavigateToScanner: () -> Unit,
+    onAddWaterQuick: () -> Unit,
+    onNavigateToCoinsHub: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FabActionPill("📸 Scan Meal", Icons.Default.CameraAlt, onNavigateToScanner)
+                FabActionPill("💧 Add Water (+250ml)", Icons.Default.WaterDrop, onAddWaterQuick)
+                FabActionPill("🪙 MP Coins Hub", Icons.Default.MonetizationOn, onNavigateToCoinsHub)
+            }
+        }
+
+        FloatingActionButton(
+            onClick = onToggleExpand,
+            containerColor = OrangePrimary,
+            contentColor = Color.White,
+            shape = CircleShape
+        ) {
+            Icon(
+                imageVector = if (isExpanded) Icons.Default.Close else Icons.Default.Add,
+                contentDescription = "Quick Hub"
+            )
+        }
+    }
+}
+
+@Composable
+private fun FabActionPill(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        color = Color(0xFF181824),
+        shape = RoundedCornerShape(20.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.5f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = OrangeSecondary,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
     }
 }
 
 @Composable
 private fun GlassHeaderSection(
-    onNavigateToProfile: () -> Unit = {}
+    onNavigateToProfile: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -312,7 +991,10 @@ private fun GlassHeaderSection(
             Surface(
                 color = OrangePrimary.copy(alpha = 0.2f),
                 shape = RoundedCornerShape(20.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.5f))
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    OrangePrimary.copy(alpha = 0.5f)
+                )
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
@@ -351,7 +1033,6 @@ private fun GlassHeaderSection(
             )
         }
 
-        // User Avatar / Streak Badge
         GlassContainer(
             modifier = Modifier
                 .size(60.dp)
@@ -373,16 +1054,11 @@ private fun GlassHeaderSection(
     }
 }
 
-/**
- * Daily activity card. [collapseProgress] goes from 0f (full card) to 1f (compact card):
- * the title row fades out, the ring shrinks to the left with the kcal inside it, and the
- * steps / active min / workouts stats slide into a compact row on the right.
- */
 @Composable
 private fun GlassActivityCard(
     collapseProgress: Float,
     expandedHeight: Dp,
-    collapsedHeight: Dp
+    collapsedHeight: Dp,
 ) {
     val p = collapseProgress
 
@@ -414,7 +1090,6 @@ private fun GlassActivityCard(
                 .padding(cardPadding),
             verticalArrangement = Arrangement.Center
         ) {
-            // Title row (fades out and shrinks while collapsing)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -462,7 +1137,6 @@ private fun GlassActivityCard(
 
             Spacer(modifier = Modifier.height(headerGap))
 
-            // Progress ring (always on the left) + stats (always on the right)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -483,7 +1157,6 @@ private fun GlassActivityCard(
                         .fillMaxHeight(),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Expanded: vertical list of stats
                     Column(
                         modifier = Modifier
                             .wrapContentHeight(Alignment.CenterVertically, unbounded = true)
@@ -512,7 +1185,6 @@ private fun GlassActivityCard(
                         )
                     }
 
-                    // Collapsed: compact row of stats
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -545,12 +1217,11 @@ private fun GlassActivityCard(
     }
 }
 
-/** Glass ring arc with the kcal count inside. Resizes smoothly between expanded and compact. */
 @Composable
 private fun ActivityRing(
     ringSize: Dp,
     strokeWidth: Dp,
-    collapseProgress: Float
+    collapseProgress: Float,
 ) {
     val expandedContentAlpha = (1f - collapseProgress * 2f).coerceIn(0f, 1f)
     val compactContentAlpha = (collapseProgress * 2f - 1f).coerceIn(0f, 1f)
@@ -563,7 +1234,6 @@ private fun ActivityRing(
             val strokePx = strokeWidth.toPx()
             val arcSize = Size(size.width - strokePx, size.height - strokePx)
 
-            // Background track arc
             drawArc(
                 color = Color.White.copy(alpha = 0.1f),
                 startAngle = 135f,
@@ -574,11 +1244,10 @@ private fun ActivityRing(
                 style = Stroke(width = strokePx, cap = StrokeCap.Round)
             )
 
-            // Glowing Orange active progress arc
             drawArc(
                 brush = Brush.horizontalGradient(listOf(OrangePrimary, OrangeSecondary)),
                 startAngle = 135f,
-                sweepAngle = 210f, // 78% of 270 degrees
+                sweepAngle = 210f,
                 useCenter = false,
                 topLeft = Offset(strokePx / 2, strokePx / 2),
                 size = arcSize,
@@ -586,7 +1255,6 @@ private fun ActivityRing(
             )
         }
 
-        // Expanded center: fire icon + kcal
         Column(
             modifier = Modifier.graphicsLayer { this.alpha = expandedContentAlpha },
             horizontalAlignment = Alignment.CenterHorizontally
@@ -610,7 +1278,6 @@ private fun ActivityRing(
             )
         }
 
-        // Compact center: kcal only
         Column(
             modifier = Modifier.graphicsLayer { this.alpha = compactContentAlpha },
             horizontalAlignment = Alignment.CenterHorizontally
@@ -635,7 +1302,7 @@ private fun ActivityStatRow(
     icon: ImageVector,
     value: String,
     unit: String,
-    color: Color
+    color: Color,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
@@ -669,13 +1336,12 @@ private fun ActivityStatRow(
     }
 }
 
-/** Small vertical stat (icon, value, label) used in the collapsed activity card. */
 @Composable
 private fun CompactActivityStat(
     icon: ImageVector,
     value: String,
     label: String,
-    color: Color
+    color: Color,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -705,14 +1371,13 @@ private fun CompactActivityStat(
 
 @Composable
 private fun GlassFeaturedWorkoutCard(
-    onStartWorkout: () -> Unit = {}
+    onStartWorkout: () -> Unit = {},
 ) {
     GlassContainer(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp)
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
-            // Background subtle gradient glow overlay
             Canvas(modifier = Modifier.matchParentSize()) {
                 drawRect(
                     brush = Brush.horizontalGradient(
@@ -804,7 +1469,7 @@ private fun GlassQuickActionCard(
     icon: ImageVector,
     gradientColors: List<Color>,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit = {}
+    onClick: () -> Unit = {},
 ) {
     GlassContainer(
         modifier = modifier.clickable(onClick = onClick),
@@ -849,7 +1514,7 @@ private fun GlassQuickActionCard(
 
 @Composable
 private fun GlassMuscleRecoveryCard(
-    onOpenHeatmap: () -> Unit
+    onOpenHeatmap: () -> Unit,
 ) {
     GlassContainer(
         modifier = Modifier
@@ -868,7 +1533,11 @@ private fun GlassMuscleRecoveryCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Box(
                         modifier = Modifier
                             .size(32.dp)
@@ -876,26 +1545,33 @@ private fun GlassMuscleRecoveryCard(
                             .background(OrangePrimary.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.AccessibilityNew, contentDescription = null, tint = OrangeSecondary, modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Default.AccessibilityNew,
+                            contentDescription = null,
+                            tint = OrangeSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "MUSCLE RECOVERY HEATMAP",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = OrangePrimary,
-                            letterSpacing = 1.sp
+                            letterSpacing = 1.sp,
+                            maxLines = 1
                         )
                         Text(
                             text = "Chest & Triceps Strained 🔥",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
+                            color = Color.White,
+                            maxLines = 1
                         )
                     }
                 }
 
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "View", tint = OrangeSecondary)
+                Spacer(modifier = Modifier.width(6.dp))
             }
 
             LazyRow(
@@ -923,7 +1599,13 @@ private fun MuscleRecoveryPill(muscle: String, status: String, color: Color) {
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(color))
-            Text(text = "$muscle ($status)", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 10.sp)
+            Text(
+                text = "$muscle ($status)",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                fontSize = 10.sp
+            )
         }
     }
 }
@@ -951,15 +1633,11 @@ private fun GlassMotivationalCard() {
     }
 }
 
-/**
- * Reusable Glassmorphism Container with translucent background,
- * subtle white/orange border highlights, and soft frosted depth.
- */
 @Composable
 fun GlassContainer(
     modifier: Modifier = Modifier,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(24.dp),
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     Box(
         modifier = modifier

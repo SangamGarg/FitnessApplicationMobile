@@ -290,7 +290,9 @@ fun MusclePlayNavigation(
                     onNavigateToWorkouts = { navController.navigate(Routes.WORKOUTS) },
                     onNavigateToGames = { navController.navigate(Routes.GAMES) },
                     onNavigateToCalculators = { navController.navigate(Routes.CALCULATORS) },
-                    onNavigateToProfile = { navController.navigate(Routes.PROFILE) }
+                    onNavigateToProfile = { navController.navigate(Routes.PROFILE) },
+                    onNavigateToScanner = { navController.navigate(Routes.INGREDIENT_SCANNER) },
+                    onNavigateToCoinsHub = { navController.navigate(Routes.PROFILE_COIN_REDEMPTION) }
                 )
             }
             composable(Routes.DIET_HOME) {
