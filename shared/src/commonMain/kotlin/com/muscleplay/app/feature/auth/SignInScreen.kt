@@ -1,5 +1,6 @@
 package com.muscleplay.app.feature.auth
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 private val OrangePrimary = Color(0xFFFF5722)
 private val OrangeSecondary = Color(0xFFFF9800)
@@ -277,55 +279,190 @@ fun SignInScreen(
                 }
             }
 
-            // Forgot Password Dialog
+            // Dark Glassmorphic Forgot Password & OTP Verification Dialog
             if (showForgotPasswordDialog) {
                 var resetEmailText by remember { mutableStateOf(email.text.trim()) }
+                var isOtpSent by remember { mutableStateOf(false) }
+                var enteredOtpCode by remember { mutableStateOf("") }
+                var isOtpVerified by remember { mutableStateOf(false) }
+                var otpStatusMessage by remember { mutableStateOf<String?>(null) }
+
                 val resetEmailError = AuthValidator.emailError(resetEmailText)
                 val visibleResetError = if (resetEmailText.isNotEmpty()) resetEmailError else null
 
-                AlertDialog(onDismissRequest = { showForgotPasswordDialog = false }, icon = {
-                    Icon(
-                        Icons.Default.LockReset, contentDescription = null, tint = OrangePrimary
-                    )
-                }, title = { Text("Reset Password") }, text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Enter your email address and we'll send you a password reset link.")
-                        OutlinedTextField(
-                            value = resetEmailText,
-                            onValueChange = { input ->
-                                resetEmailText = input.filter { !it.isWhitespace() }
-                                    .take(AuthValidator.MAX_EMAIL_LENGTH)
-                            },
-                            placeholder = { Text("your.email@domain.com") },
-                            isError = visibleResetError != null,
-                            supportingText = visibleResetError?.let { msg -> { Text(msg) } },
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Email, imeAction = ImeAction.Done
-                            ),
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
+                AlertDialog(
+                    onDismissRequest = { showForgotPasswordDialog = false },
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = Color(0xFF181824),
+                    icon = {
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(OrangePrimary.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LockReset,
+                                contentDescription = null,
+                                tint = OrangeSecondary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    },
+                    title = {
+                        Text(
+                            text = "Reset Password 🔑",
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
                         )
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(
+                                text = "Enter your registered email address and request an OTP to reset your password.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+
+                            // 1. Email Input Field
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Email Address", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                                OutlinedTextField(
+                                    value = resetEmailText,
+                                    onValueChange = { input ->
+                                        resetEmailText = input.filter { !it.isWhitespace() }.take(AuthValidator.MAX_EMAIL_LENGTH)
+                                        isOtpSent = false
+                                        isOtpVerified = false
+                                        enteredOtpCode = ""
+                                        otpStatusMessage = null
+                                    },
+                                    placeholder = { Text("your.email@domain.com", color = Color.White.copy(alpha = 0.4f)) },
+                                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = OrangePrimary) },
+                                    isError = visibleResetError != null,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(14.dp),
+                                    singleLine = true,
+                                    colors = inputColors()
+                                )
+                                visibleResetError?.let { msg ->
+                                    Text(msg, style = MaterialTheme.typography.labelSmall, color = Color(0xFFFF5252))
+                                }
+                            }
+
+                            // 2. Small "Send OTP" Button below Email Address Field
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                Button(
+                                    onClick = {
+                                        if (resetEmailError == null && resetEmailText.isNotBlank()) {
+                                            isOtpSent = true
+                                            otpStatusMessage = "📩 Demo OTP sent: 123456"
+                                        }
+                                    },
+                                    enabled = resetEmailError == null && resetEmailText.isNotBlank(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = OrangePrimary.copy(alpha = 0.25f),
+                                        contentColor = OrangeSecondary,
+                                        disabledContainerColor = Color.White.copy(alpha = 0.08f)
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Icon(Icons.Default.MarkEmailRead, contentDescription = null, tint = OrangeSecondary, modifier = Modifier.size(16.dp))
+                                        Text(
+                                            text = if (isOtpSent) "Resend OTP" else "Send OTP 📩",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            color = OrangeSecondary
+                                        )
+                                    }
+                                }
+                            }
+
+                            // 3. OTP Fill View (Revealed after clicking Send OTP, positioned ABOVE Send Link button)
+                            AnimatedVisibility(visible = isOtpSent) {
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text("Enter 6-Digit OTP Code", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                                    OutlinedTextField(
+                                        value = enteredOtpCode,
+                                        onValueChange = { input ->
+                                            enteredOtpCode = input.filter { it.isDigit() }.take(6)
+                                            if (enteredOtpCode == "123456") {
+                                                isOtpVerified = true
+                                                otpStatusMessage = "✅ OTP Verified Successfully!"
+                                            } else {
+                                                isOtpVerified = false
+                                                if (enteredOtpCode.length == 6) {
+                                                    otpStatusMessage = "❌ Incorrect OTP code. Try 123456"
+                                                }
+                                            }
+                                        },
+                                        placeholder = { Text("e.g. 123456", color = Color.White.copy(alpha = 0.4f)) },
+                                        leadingIcon = { Icon(Icons.Default.Pin, contentDescription = null, tint = OrangePrimary) },
+                                        trailingIcon = {
+                                            if (isOtpVerified) {
+                                                Icon(Icons.Default.CheckCircle, contentDescription = "Verified", tint = Color(0xFF4CAF50))
+                                            }
+                                        },
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = inputColors()
+                                    )
+
+                                    otpStatusMessage?.let { msg ->
+                                        Text(
+                                            text = msg,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (isOtpVerified) Color(0xFF4CAF50) else OrangeSecondary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showForgotPasswordDialog = false
+                                snackbarMessage = "Password reset link sent to ${resetEmailText.trim()}"
+                            },
+                            enabled = isOtpVerified,
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = OrangePrimary,
+                                disabledContainerColor = Color.White.copy(alpha = 0.12f)
+                            )
+                        ) {
+                            Text("Send Link", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showForgotPasswordDialog = false }) {
+                            Text("Cancel", color = Color.White.copy(alpha = 0.6f))
+                        }
                     }
-                }, confirmButton = {
-                    Button(
-                        onClick = {
-                            showForgotPasswordDialog = false
-                            snackbarMessage = "Password reset link sent to ${resetEmailText.trim()}"
-                        },
-                        enabled = resetEmailError == null,
-                        colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
-                    ) {
-                        Text("Send Link")
-                    }
-                }, dismissButton = {
-                    TextButton(onClick = { showForgotPasswordDialog = false }) {
-                        Text("Cancel")
-                    }
-                })
+                )
             }
         }
     }
 }
+
+@Composable
+private fun inputColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = Color.White,
+    unfocusedTextColor = Color.White,
+    focusedBorderColor = OrangePrimary,
+    unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+    errorBorderColor = Color(0xFFFF5252),
+    errorLabelColor = Color(0xFFFF5252)
+)
 
 @Composable
 private fun GlassCardContainer(

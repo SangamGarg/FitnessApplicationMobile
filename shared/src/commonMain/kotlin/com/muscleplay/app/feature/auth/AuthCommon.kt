@@ -34,7 +34,7 @@ internal data class PasswordRule(val label: String, val isMet: Boolean)
 internal object AuthValidator {
     const val MAX_EMAIL_LENGTH = 254
     const val MAX_NAME_LENGTH = 50
-    const val MIN_PASSWORD_LENGTH = 12
+    const val MIN_PASSWORD_LENGTH = 8
     const val MAX_PASSWORD_LENGTH = 64
 
     private val EMAIL_REGEX = Regex(

@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 private val OrangePrimary = Color(0xFFFF5722)
 private val OrangeSecondary = Color(0xFFFF9800)
@@ -43,7 +44,6 @@ fun SignUpScreen(
     onNavigateToOtp: (email: String) -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
 ) {
-    val fullName = remember { FieldState() }
     val email = remember { FieldState() }
     val password = remember { FieldState() }
     val confirmPassword = remember { FieldState() }
@@ -56,30 +56,26 @@ fun SignUpScreen(
     val focusManager = LocalFocusManager.current
 
     // ---- Validation ----
-    val nameError = AuthValidator.nameError(fullName.text)
     val emailError = AuthValidator.emailError(email.text)
     val passwordRules = AuthValidator.passwordRules(password.text)
     val passwordValid = AuthValidator.isPasswordValid(password.text)
     val confirmError = AuthValidator.confirmPasswordError(password.text, confirmPassword.text)
 
     // Errors only appear after the user has left the field (or pressed the button)
-    val visibleNameError = if (fullName.touched) nameError else null
     val visibleEmailError = if (email.touched) emailError else null
     val visiblePasswordError =
         if (password.touched && !passwordValid) "Password doesn't meet all requirements" else null
     val visibleConfirmError = if (confirmPassword.touched) confirmError else null
 
     // Button stays disabled until every field is filled and terms are accepted
-    val canSubmit = fullName.text.isNotBlank() &&
-            email.text.isNotBlank() &&
+    val canSubmit = email.text.isNotBlank() &&
             password.text.isNotEmpty() &&
             confirmPassword.text.isNotEmpty() &&
             termsAccepted
 
     fun submit() {
-        listOf(fullName, email, password, confirmPassword).forEach { it.touched = true }
-        val hasErrors = nameError != null ||
-                emailError != null ||
+        listOf(email, password, confirmPassword).forEach { it.touched = true }
+        val hasErrors = emailError != null ||
                 !passwordValid ||
                 confirmError != null
         if (hasErrors) {
@@ -201,24 +197,6 @@ fun SignUpScreen(
                                 modifier = Modifier.padding(22.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                // Full Name
-                                AuthTextField(
-                                    value = fullName.text,
-                                    onValueChange = {
-                                        if (it.length <= AuthValidator.MAX_NAME_LENGTH) fullName.text =
-                                            it
-                                    },
-                                    label = "Full Name",
-                                    leadingIcon = Icons.Default.Person,
-                                    errorText = visibleNameError,
-                                    keyboardOptions = KeyboardOptions(
-                                        capitalization = KeyboardCapitalization.Words,
-                                        keyboardType = KeyboardType.Text,
-                                        imeAction = ImeAction.Next
-                                    ),
-                                    onFocusChanged = { fullName.onFocusChanged(it) }
-                                )
-
                                 // Email Input
                                 AuthTextField(
                                     value = email.text,
@@ -377,18 +355,29 @@ fun SignUpScreen(
             if (showTermsDialog) {
                 AlertDialog(
                     onDismissRequest = { showTermsDialog = false },
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = Color(0xFF181824),
                     icon = {
-                        Icon(
-                            imageVector = Icons.Default.Gavel,
-                            contentDescription = null,
-                            tint = OrangePrimary,
-                            modifier = Modifier.size(32.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(OrangePrimary.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Gavel,
+                                contentDescription = null,
+                                tint = OrangeSecondary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     },
                     title = {
                         Text(
-                            text = "Terms & Privacy Policy",
-                            fontWeight = FontWeight.Bold
+                            text = "Terms & Privacy Policy 📜",
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
                         )
                     },
                     text = {
@@ -396,51 +385,87 @@ fun SignUpScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(max = 350.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             item {
-                                Text(
-                                    text = "1. Terms of Service",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = OrangeSecondary
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "By creating an account on MusclePlay, you agree to follow our community guidelines. Exercises provided in the app should be performed safely at your own pace.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White.copy(alpha = 0.8f)
-                                )
+                                Surface(
+                                    color = Color.White.copy(alpha = 0.05f),
+                                    shape = RoundedCornerShape(16.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(14.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "1. Terms of Service",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = OrangeSecondary
+                                        )
+                                        Text(
+                                            text = "By creating an account on MusclePlay, you agree to follow our community guidelines. Exercises provided in the app should be performed safely at your own pace.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color.White.copy(alpha = 0.85f),
+                                            lineHeight = 18.sp
+                                        )
+                                    }
+                                }
                             }
 
                             item {
-                                Text(
-                                    text = "2. AI Camera & Pose Tracking",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = OrangeSecondary
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Camera video feeds for rep tracking and squat/push-up master games are processed on-device in real-time. MusclePlay does NOT upload or record video recordings to cloud servers.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White.copy(alpha = 0.8f)
-                                )
+                                Surface(
+                                    color = Color.White.copy(alpha = 0.05f),
+                                    shape = RoundedCornerShape(16.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(14.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "2. AI Camera & Pose Tracking",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = OrangeSecondary
+                                        )
+                                        Text(
+                                            text = "Camera video feeds for rep tracking and squat/push-up master games are processed on-device in real-time. MusclePlay does NOT upload or record video recordings to cloud servers.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color.White.copy(alpha = 0.85f),
+                                            lineHeight = 18.sp
+                                        )
+                                    }
+                                }
                             }
 
                             item {
-                                Text(
-                                    text = "3. Privacy Policy",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = OrangeSecondary
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Your account details and fitness stats are encrypted and protected. We do not sell or share your personal health data with third-party advertisers.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White.copy(alpha = 0.8f)
-                                )
+                                Surface(
+                                    color = Color.White.copy(alpha = 0.05f),
+                                    shape = RoundedCornerShape(16.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(14.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "3. Privacy Policy",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = OrangeSecondary
+                                        )
+                                        Text(
+                                            text = "Your account details and fitness stats are encrypted and protected. We do not sell or share your personal health data with third-party advertisers.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color.White.copy(alpha = 0.85f),
+                                            lineHeight = 18.sp
+                                        )
+                                    }
+                                }
                             }
                         }
                     },
@@ -452,12 +477,12 @@ fun SignUpScreen(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
                         ) {
-                            Text("I Accept", fontWeight = FontWeight.Bold)
+                            Text("I Accept", fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { showTermsDialog = false }) {
-                            Text("Close")
+                            Text("Close", color = Color.White.copy(alpha = 0.6f))
                         }
                     }
                 )

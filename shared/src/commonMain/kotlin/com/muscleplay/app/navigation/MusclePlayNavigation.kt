@@ -47,6 +47,7 @@ import com.muscleplay.app.feature.games.pushup.PushUpCameraScreen
 import com.muscleplay.app.feature.games.squat.SquatCameraScreen
 import com.muscleplay.app.feature.home.HomeScreen
 import com.muscleplay.app.feature.onboarding.OnboardingScreen
+import com.muscleplay.app.feature.onboarding.UserProfileSetupScreen
 import com.muscleplay.app.feature.onboarding.rememberOnboardingPreferences
 import com.muscleplay.app.feature.profile.ProfileScreen
 import com.muscleplay.app.feature.profile.diagnostics.SelfDiagnosticsScreen
@@ -70,6 +71,7 @@ private object Routes {
     const val SIGN_IN = "sign_in"
     const val SIGN_UP = "sign_up"
     const val OTP_VERIFICATION = "otp_verification"
+    const val USER_PROFILE_SETUP = "user_profile_setup"
 
     const val DIET_HOME = "diet_home"
     const val INGREDIENT_SCANNER = "ingredient_scanner"
@@ -134,6 +136,7 @@ fun MusclePlayNavigation(
         Routes.SIGN_IN,
         Routes.SIGN_UP,
         Routes.OTP_VERIFICATION,
+        Routes.USER_PROFILE_SETUP,
         Routes.INGREDIENT_SCANNER,
         Routes.SQUAT_MASTER_ROUTE,
         Routes.REP_CHALLENGE_ROUTE,
@@ -218,8 +221,8 @@ fun MusclePlayNavigation(
                     onSplashFinished = {
                         val destination = if (onboardingPreferences.isOnboardingCompleted()) {
                             //TODO
-                            //Routes.SIGN_IN
-                            Routes.HOME
+                            Routes.SIGN_IN
+                            //Routes.HOME
                         } else {
                             Routes.ONBOARDING
                         }
@@ -273,7 +276,7 @@ fun MusclePlayNavigation(
                 OtpVerificationScreen(
                     userEmail = userEmail,
                     onOtpVerified = {
-                        navController.navigate(Routes.HOME) {
+                        navController.navigate(Routes.USER_PROFILE_SETUP) {
                             popUpTo(Routes.SIGN_IN) {
                                 inclusive = true
                             }
@@ -281,6 +284,17 @@ fun MusclePlayNavigation(
                     },
                     onBack = {
                         navController.popBackStack()
+                    }
+                )
+            }
+            composable(Routes.USER_PROFILE_SETUP) {
+                UserProfileSetupScreen(
+                    onSetupComplete = {
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(Routes.USER_PROFILE_SETUP) {
+                                inclusive = true
+                            }
+                        }
                     }
                 )
             }

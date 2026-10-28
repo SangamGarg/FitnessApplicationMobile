@@ -45,9 +45,9 @@ data class OnboardingPageData(
 
 val onboardingPages = listOf(
     OnboardingPageData(
-        title = "Track Your Transformation",
-        description = "Monitor daily muscle growth, strength metrics, and body composition with automated analytics.",
-        icon = Icons.Default.FitnessCenter,
+        title = "AI Pose Tracking & Motion",
+        description = "Real-time camera pose estimation tracks your squats, push-ups, and form precision on-device.",
+        icon = Icons.Default.AutoAwesome,
         badgeText = "STEP 1 OF 3"
     ),
     OnboardingPageData(
@@ -57,8 +57,8 @@ val onboardingPages = listOf(
         badgeText = "STEP 2 OF 3"
     ),
     OnboardingPageData(
-        title = "Smart AI Diagnostics",
-        description = "Get real-time feedback on your workout form, camera tracking, and sensor-based health insights.",
+        title = "Smart AI Diagnostics & Rewards",
+        description = "Get instant health analytics, 5-in-1 fitness calculators, and earn redeemable MP Coins.",
         icon = Icons.Default.Psychology,
         badgeText = "STEP 3 OF 3"
     )
@@ -71,7 +71,6 @@ fun OnboardingScreen(
     val pagerState = rememberPagerState(pageCount = { onboardingPages.size })
     val coroutineScope = rememberCoroutineScope()
 
-    // Ambient Glowing Background Pulsing Animation
     val infiniteTransition = rememberInfiniteTransition(label = "onboardingPulse")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.25f,
@@ -83,7 +82,6 @@ fun OnboardingScreen(
         label = "pulseAlpha"
     )
 
-    // Animated Circular Progress Arc (33% -> 66% -> 100%)
     val targetProgress = when (pagerState.currentPage) {
         0 -> 0.333f
         1 -> 0.666f
@@ -101,7 +99,6 @@ fun OnboardingScreen(
             .fillMaxSize()
             .background(DarkBackground)
     ) {
-        // Glowing Background Orbs
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
@@ -170,7 +167,7 @@ fun OnboardingScreen(
                         .fillMaxWidth()
                 ) { pageIndex ->
                     val pageData = onboardingPages[pageIndex]
-                    OnboardingPageItem(pageData = pageData)
+                    OnboardingPageItem(pageIndex = pageIndex, pageData = pageData)
                 }
 
                 // Bottom Section: Progress Ring / Get Started Button
@@ -188,7 +185,6 @@ fun OnboardingScreen(
                         label = "bottomAction"
                     ) { isLastPage ->
                         if (isLastPage) {
-                            // Full-width Get Started Button on Last Page
                             Button(
                                 onClick = onOnboardingFinished,
                                 modifier = Modifier
@@ -214,13 +210,11 @@ fun OnboardingScreen(
                                 }
                             }
                         } else {
-                            // Animated Circular Progress Indicator Ring around Next Arrow
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Page dots
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     onboardingPages.indices.forEach { index ->
                                         Box(
@@ -235,7 +229,6 @@ fun OnboardingScreen(
                                     }
                                 }
 
-                                // Circular Ring Progress Button
                                 Box(
                                     modifier = Modifier.size(76.dp),
                                     contentAlignment = Alignment.Center
@@ -245,7 +238,6 @@ fun OnboardingScreen(
                                         val diameter = size.minDimension - strokeWidth
                                         val topLeft = Offset(strokeWidth / 2f, strokeWidth / 2f)
 
-                                        // Track Arc
                                         drawArc(
                                             color = Color.White.copy(alpha = 0.15f),
                                             startAngle = -90f,
@@ -256,7 +248,6 @@ fun OnboardingScreen(
                                             style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                                         )
 
-                                        // Progress Arc (33% -> 66% -> 100%)
                                         drawArc(
                                             brush = Brush.sweepGradient(
                                                 colors = listOf(OrangePrimary, OrangeSecondary, OrangePrimary)
@@ -303,7 +294,7 @@ fun OnboardingScreen(
 }
 
 @Composable
-private fun OnboardingPageItem(pageData: OnboardingPageData) {
+private fun OnboardingPageItem(pageIndex: Int, pageData: OnboardingPageData) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -311,53 +302,58 @@ private fun OnboardingPageItem(pageData: OnboardingPageData) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Hero Glassmorphic Icon Circle
-        Box(
-            modifier = Modifier
-                .size(160.dp)
-                .clip(CircleShape)
-                .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.12f),
-                            Color.White.copy(alpha = 0.04f)
-                        )
-                    )
-                )
-                .border(
-                    width = 2.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.4f),
-                            OrangePrimary.copy(alpha = 0.35f),
-                            Color.White.copy(alpha = 0.1f)
-                        )
-                    ),
-                    shape = CircleShape
-                ),
-            contentAlignment = Alignment.Center
-        ) {
+        if (pageIndex == 0) {
+            // Interactive Animated Skeleton Keypoint Pose Preview on Slide 1
+            InteractiveSkeletonPosePreview()
+        } else {
+            // Hero Icon Circle for Slides 2 and 3
             Box(
                 modifier = Modifier
-                    .size(110.dp)
+                    .size(160.dp)
                     .clip(CircleShape)
                     .background(
                         brush = Brush.linearGradient(
-                            colors = listOf(OrangePrimary, OrangeSecondary)
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.12f),
+                                Color.White.copy(alpha = 0.04f)
+                            )
                         )
+                    )
+                    .border(
+                        width = 2.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.4f),
+                                OrangePrimary.copy(alpha = 0.35f),
+                                Color.White.copy(alpha = 0.1f)
+                            )
+                        ),
+                        shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = pageData.icon,
-                    contentDescription = pageData.title,
-                    tint = Color.White,
-                    modifier = Modifier.size(60.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(110.dp)
+                        .clip(CircleShape)
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(OrangePrimary, OrangeSecondary)
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = pageData.icon,
+                        contentDescription = pageData.title,
+                        tint = Color.White,
+                        modifier = Modifier.size(60.dp)
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(36.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
         // Step Badge
         Surface(
@@ -374,7 +370,7 @@ private fun OnboardingPageItem(pageData: OnboardingPageData) {
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         // Title
         Text(
@@ -385,7 +381,7 @@ private fun OnboardingPageItem(pageData: OnboardingPageData) {
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Description
         Text(
@@ -396,5 +392,92 @@ private fun OnboardingPageItem(pageData: OnboardingPageData) {
             modifier = Modifier.padding(horizontal = 12.dp),
             lineHeight = 22.sp
         )
+    }
+}
+
+@Composable
+private fun InteractiveSkeletonPosePreview() {
+    val infiniteTransition = rememberInfiniteTransition(label = "poseAnim")
+    val squatOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "squatOffset"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Surface(
+            color = Color.Black.copy(alpha = 0.6f),
+            shape = RoundedCornerShape(14.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF4CAF50))
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF4CAF50)))
+                Text("AI Camera Pose Tracking (99% Accuracy)", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .width(220.dp)
+                .height(180.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color.Black.copy(alpha = 0.85f))
+                .border(1.5.dp, OrangePrimary.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val w = size.width
+                val h = size.height
+                val yShift = squatOffset
+
+                val head = Offset(w * 0.5f, h * 0.20f + yShift)
+                val neck = Offset(w * 0.5f, h * 0.30f + yShift)
+                val leftShoulder = Offset(w * 0.35f, h * 0.32f + yShift)
+                val rightShoulder = Offset(w * 0.65f, h * 0.32f + yShift)
+                val leftElbow = Offset(w * 0.25f, h * 0.45f + yShift)
+                val rightElbow = Offset(w * 0.75f, h * 0.45f + yShift)
+                val spine = Offset(w * 0.5f, h * 0.55f + yShift)
+                val leftHip = Offset(w * 0.40f, h * 0.58f + yShift)
+                val rightHip = Offset(w * 0.60f, h * 0.58f + yShift)
+                val leftKnee = Offset(w * 0.35f, h * 0.75f)
+                val rightKnee = Offset(w * 0.65f, h * 0.75f)
+                val leftAnkle = Offset(w * 0.35f, h * 0.90f)
+                val rightAnkle = Offset(w * 0.65f, h * 0.90f)
+
+                val lineStroke = Stroke(width = 4f, cap = StrokeCap.Round)
+                val skeletalColor = Color(0xFF4CAF50)
+
+                // Skeletal Lines
+                drawLine(skeletalColor, head, neck, strokeWidth = 4f)
+                drawLine(skeletalColor, neck, leftShoulder, strokeWidth = 4f)
+                drawLine(skeletalColor, neck, rightShoulder, strokeWidth = 4f)
+                drawLine(skeletalColor, leftShoulder, leftElbow, strokeWidth = 4f)
+                drawLine(skeletalColor, rightShoulder, rightElbow, strokeWidth = 4f)
+                drawLine(skeletalColor, neck, spine, strokeWidth = 4f)
+                drawLine(skeletalColor, spine, leftHip, strokeWidth = 4f)
+                drawLine(skeletalColor, spine, rightHip, strokeWidth = 4f)
+                drawLine(skeletalColor, leftHip, leftKnee, strokeWidth = 4f)
+                drawLine(skeletalColor, rightHip, rightKnee, strokeWidth = 4f)
+                drawLine(skeletalColor, leftKnee, leftAnkle, strokeWidth = 4f)
+                drawLine(skeletalColor, rightKnee, rightAnkle, strokeWidth = 4f)
+
+                // Glowing Keypoint Joint Circles
+                listOf(head, neck, leftShoulder, rightShoulder, leftElbow, rightElbow, leftHip, rightHip, leftKnee, rightKnee, leftAnkle, rightAnkle).forEach { joint ->
+                    drawCircle(color = OrangePrimary, radius = 6f, center = joint)
+                    drawCircle(color = Color.White, radius = 3f, center = joint)
+                }
+            }
+        }
     }
 }

@@ -46,6 +46,8 @@ private val OrangeSecondary = Color(0xFFFF9800)
 private val OrangeGlow = Color(0xFFFF3D00)
 private val DarkBackground = Color(0xFF0F0F17)
 
+private const val RESEND_TIMER_SECONDS = 60;
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun OtpVerificationScreen(
@@ -53,10 +55,11 @@ fun OtpVerificationScreen(
     onOtpVerified: () -> Unit,
     onBack: () -> Unit
 ) {
+
     var otpText by remember { mutableStateOf("") }
     var isVerifying by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var timerSeconds by remember { mutableIntStateOf(45) }
+    var timerSeconds by remember { mutableIntStateOf(RESEND_TIMER_SECONDS) }
     var canResend by remember { mutableStateOf(false) }
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
 
@@ -336,7 +339,7 @@ fun OtpVerificationScreen(
                                                 fontWeight = FontWeight.ExtraBold,
                                                 color = OrangePrimary,
                                                 modifier = Modifier.clickable(enabled = !isVerifying) {
-                                                    timerSeconds = 45
+                                                    timerSeconds = RESEND_TIMER_SECONDS
                                                     canResend = false
                                                     otpText = ""
                                                     errorMessage = null

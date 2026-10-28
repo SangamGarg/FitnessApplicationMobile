@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -32,6 +33,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -93,10 +95,10 @@ fun HomeScreen(
     var isFabMenuExpanded by remember { mutableStateOf(false) }
 
     val density = LocalDensity.current
-    val expandedCardHeight = 240.dp
-    val collapsedCardHeight = 92.dp
-    val headerTopPadding = 24.dp
-    val headerCardSpacing = 20.dp
+    val expandedCardHeight = 205.dp
+    val collapsedCardHeight = 84.dp
+    val headerTopPadding = 20.dp
+    val headerCardSpacing = 16.dp
 
     val cardRangePx = with(density) { (expandedCardHeight - collapsedCardHeight).toPx() }
     val spacingPx = with(density) { headerCardSpacing.toPx() }
@@ -184,6 +186,13 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .height(topSectionHeight)
                     .clipToBounds()
+                    .pointerInput(currentTotalRange) {
+                        detectVerticalDragGestures { change, dragAmount ->
+                            change.consume()
+                            val old = collapsedPx
+                            collapsedPx = (old - dragAmount).coerceIn(0f, totalRangePx)
+                        }
+                    }
             ) {
                 Column(
                     modifier = Modifier
@@ -1063,16 +1072,16 @@ private fun GlassActivityCard(
     val p = collapseProgress
 
     val cardHeight = lerp(expandedHeight, collapsedHeight, p)
-    val cardPadding = lerp(22.dp, 12.dp, p)
-    val cornerRadius = lerp(28.dp, 20.dp, p)
+    val cardPadding = lerp(16.dp, 10.dp, p)
+    val cornerRadius = lerp(24.dp, 18.dp, p)
 
     val headerHeight = ActivityHeaderRowHeight * (1f - p)
-    val headerGap = 20.dp * (1f - p)
+    val headerGap = 12.dp * (1f - p)
     val headerAlpha = (1f - p * 2.5f).coerceIn(0f, 1f)
 
-    val contentRowHeight = lerp(130.dp, 64.dp, p)
-    val ringSize = lerp(110.dp, 64.dp, p)
-    val ringStroke = lerp(12.dp, 6.dp, p)
+    val contentRowHeight = lerp(110.dp, 56.dp, p)
+    val ringSize = lerp(94.dp, 56.dp, p)
+    val ringStroke = lerp(10.dp, 5.dp, p)
     val ringStatsGap = lerp(12.dp, 8.dp, p)
 
     val expandedStatsAlpha = (1f - p * 2f).coerceIn(0f, 1f)
