@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -23,6 +24,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.log10
@@ -106,6 +108,7 @@ fun CalculatorsScreen() {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                .imePadding()
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(top = 24.dp, bottom = 90.dp)
@@ -579,10 +582,13 @@ private fun MacroGramCard(label: String, value: String, color: Color, modifier: 
 private fun InputRow(label: String, value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
-        onValueChange = onValueChange,
+        onValueChange = { input ->
+            onValueChange(input.filter { it.isDigit() || it == '.' })
+        },
         label = { Text(label, color = OrangePrimary) },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = Color.White,
             unfocusedTextColor = Color.White,

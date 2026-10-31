@@ -41,7 +41,7 @@ private val DarkBackground = Color(0xFF0F0F17)
 
 @Composable
 fun SignUpScreen(
-    onNavigateToOtp: (email: String) -> Unit = {},
+    onNavigateToOtp: (email: String, password: String) -> Unit = { _, _ -> },
     onNavigateToSignIn: () -> Unit = {},
 ) {
     val email = remember { FieldState() }
@@ -81,7 +81,7 @@ fun SignUpScreen(
         if (hasErrors) {
             snackbarMessage = "Please fix the highlighted fields."
         } else {
-            onNavigateToOtp(email.text)
+            onNavigateToOtp(email.text, password.text)
         }
     }
 
@@ -173,10 +173,7 @@ fun SignUpScreen(
                             text = "Join MusclePlay 🔥",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.ExtraBold,
-                            color = Color.White,
-                            modifier = Modifier.clickable {
-                                onNavigateToOtp(email.text)
-                            }
+                            color = Color.White
                         )
 
                         Spacer(modifier = Modifier.height(6.dp))
@@ -339,7 +336,10 @@ fun SignUpScreen(
                         Row(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Already have an account? ", color = Color.White.copy(alpha = 0.7f))
+                            Text(
+                                "Already have an account? ",
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
                             Text(
                                 text = "Sign In",
                                 color = OrangeSecondary,
@@ -391,7 +391,10 @@ fun SignUpScreen(
                                 Surface(
                                     color = Color.White.copy(alpha = 0.05f),
                                     shape = RoundedCornerShape(16.dp),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        Color.White.copy(alpha = 0.1f)
+                                    ),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(
@@ -418,7 +421,10 @@ fun SignUpScreen(
                                 Surface(
                                     color = Color.White.copy(alpha = 0.05f),
                                     shape = RoundedCornerShape(16.dp),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        Color.White.copy(alpha = 0.1f)
+                                    ),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(
@@ -445,7 +451,10 @@ fun SignUpScreen(
                                 Surface(
                                     color = Color.White.copy(alpha = 0.05f),
                                     shape = RoundedCornerShape(16.dp),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        Color.White.copy(alpha = 0.1f)
+                                    ),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(
@@ -488,76 +497,6 @@ fun SignUpScreen(
                 )
             }
         }
-    }
-}
-
-/** Checklist that shows which password conditions are already satisfied. */
-@Composable
-private fun PasswordRequirementsList(
-    rules: List<PasswordRule>,
-    showFailures: Boolean,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color.White.copy(alpha = 0.05f))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Text(
-            text = "Your password must contain:",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = 0.8f)
-        )
-        rules.forEach { rule ->
-            PasswordRequirementRow(rule = rule, showFailure = showFailures)
-        }
-    }
-}
-
-@Composable
-private fun PasswordRequirementRow(
-    rule: PasswordRule,
-    showFailure: Boolean,
-) {
-    val failed = showFailure && !rule.isMet
-
-    val tint by animateColorAsState(
-        targetValue = when {
-            rule.isMet -> AuthSuccessGreen
-            failed -> AuthErrorRed
-            else -> Color.White.copy(alpha = 0.4f)
-        },
-        label = "ruleTint"
-    )
-    val textColor by animateColorAsState(
-        targetValue = if (rule.isMet) Color.White else Color.White.copy(alpha = 0.65f),
-        label = "ruleText"
-    )
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Crossfade(targetState = rule.isMet, label = "ruleIcon") { met ->
-            Icon(
-                imageVector = when {
-                    met -> Icons.Default.CheckCircle
-                    failed -> Icons.Default.Cancel
-                    else -> Icons.Default.RadioButtonUnchecked
-                },
-                contentDescription = if (met) "Requirement met" else "Requirement not met",
-                tint = tint,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        Text(
-            text = rule.label,
-            style = MaterialTheme.typography.bodySmall,
-            color = textColor
-        )
     }
 }
 

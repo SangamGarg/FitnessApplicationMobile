@@ -1,10 +1,23 @@
 package com.muscleplay.app.feature.auth
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -13,10 +26,13 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 
@@ -33,7 +49,7 @@ internal data class PasswordRule(val label: String, val isMet: Boolean)
  */
 internal object AuthValidator {
     const val MAX_EMAIL_LENGTH = 254
-    const val MAX_NAME_LENGTH = 50
+    const val MAX_NAME_LENGTH = 100
     const val MIN_PASSWORD_LENGTH = 8
     const val MAX_PASSWORD_LENGTH = 64
 
@@ -41,10 +57,7 @@ internal object AuthValidator {
         "^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}$"
     )
 
-    // Symbols allowed inside a name besides letters: space - ' ’ .
     private val NAME_ALLOWED_SYMBOLS = setOf(' ', '-', '\'', '\u2019', '.')
-
-    // ---------- Email ----------
 
     fun emailError(raw: String): String? {
         val email = raw.trim()
@@ -63,9 +76,6 @@ internal object AuthValidator {
         return null
     }
 
-    // ---------- Name ----------
-
-    /** Trims and collapses repeated spaces. Use this value when you actually save the name. */
     fun normalizeName(raw: String): String = raw.trim().replace(Regex("\\s+"), " ")
 
     fun nameError(raw: String): String? {
@@ -80,8 +90,6 @@ internal object AuthValidator {
         if (name.length > MAX_NAME_LENGTH) return "Name must be at most $MAX_NAME_LENGTH characters"
         return null
     }
-
-    // ---------- Password ----------
 
     fun passwordRules(password: String): List<PasswordRule> = listOf(
         PasswordRule(
@@ -107,10 +115,6 @@ internal object AuthValidator {
     }
 }
 
-/**
- * Holds the text of a field and whether the user has "touched" it (left the field at least once).
- * Errors are only shown after a field is touched, so people aren't yelled at while still typing.
- */
 @Stable
 internal class FieldState(initial: String = "") {
     var text by mutableStateOf(initial)
@@ -122,7 +126,6 @@ internal class FieldState(initial: String = "") {
     }
 }
 
-/** Styled text field used by both auth screens, with built-in error styling + message. */
 @Composable
 internal fun AuthTextField(
     value: String,
@@ -179,4 +182,74 @@ internal fun AuthTextField(
         ),
         singleLine = true
     )
+}
+
+/** Checklist that shows which password conditions are already satisfied. */
+@Composable
+internal fun PasswordRequirementsList(
+    rules: List<PasswordRule>,
+    showFailures: Boolean,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = "Your password must contain:",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color.White.copy(alpha = 0.8f)
+        )
+        rules.forEach { rule ->
+            PasswordRequirementRow(rule = rule, showFailure = showFailures)
+        }
+    }
+}
+
+@Composable
+internal fun PasswordRequirementRow(
+    rule: PasswordRule,
+    showFailure: Boolean,
+) {
+    val failed = showFailure && !rule.isMet
+
+    val tint by animateColorAsState(
+        targetValue = when {
+            rule.isMet -> AuthSuccessGreen
+            failed -> AuthErrorRed
+            else -> Color.White.copy(alpha = 0.4f)
+        },
+        label = "ruleTint"
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (rule.isMet) Color.White else Color.White.copy(alpha = 0.65f),
+        label = "ruleText"
+    )
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Crossfade(targetState = rule.isMet, label = "ruleIcon") { met ->
+            Icon(
+                imageVector = when {
+                    met -> Icons.Default.CheckCircle
+                    failed -> Icons.Default.Cancel
+                    else -> Icons.Default.RadioButtonUnchecked
+                },
+                contentDescription = if (met) "Requirement met" else "Requirement not met",
+                tint = tint,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        Text(
+            text = rule.label,
+            style = MaterialTheme.typography.bodySmall,
+            color = textColor
+        )
+    }
 }

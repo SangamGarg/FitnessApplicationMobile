@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "342252530553",
+    "project_id": "muscleplayfitness",
+    "storage_bucket": "muscleplayfitness.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:342252530553:android:88910e9f7f1f4102acdda8",
+        "android_client_info": {
+          "package_name": "com.muscleplay.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyClyF-rd4zh2P1yXLP07PBZEUFWpzA4mGY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

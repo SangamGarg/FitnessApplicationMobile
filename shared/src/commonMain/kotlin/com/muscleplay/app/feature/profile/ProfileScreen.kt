@@ -37,8 +37,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import androidx.compose.ui.unit.sp
+import com.muscleplay.app.feature.auth.AuthRepository
+import kotlinx.coroutines.launch
 
-// Vibrant Orange Glassmorphism Theme Palette
 private val OrangePrimary = Color(0xFFFF5722)
 private val OrangeSecondary = Color(0xFFFF9800)
 private val OrangeGlow = Color(0xFFFF3D00)
@@ -51,7 +53,6 @@ data class ProgressPhoto(
     val subtitle: String,
 )
 
-
 val sampleProgressPhotos = listOf(
     ProgressPhoto("1", "Day 1 - Starting Out", "Oct 1, 2024", "Initial assessment & baseline"),
     ProgressPhoto("2", "Day 15 - Building Habit", "Oct 15, 2024", "Consistent routine established"),
@@ -61,6 +62,58 @@ val sampleProgressPhotos = listOf(
     ProgressPhoto("6", "Day 75 - Definition Boost", "Dec 15, 2024", "Lower body strength gains"),
     ProgressPhoto("7", "Day 90 - Peak Fitness", "Jan 1, 2025", "Transformation milestone achieved"),
     ProgressPhoto("8", "Day 100 - Master Level", "Jan 10, 2025", "Ready for advanced workouts")
+)
+
+data class AchievementBadge(
+    val id: String,
+    val title: String,
+    val emoji: String,
+    val isUnlocked: Boolean,
+    val criteria: String,
+    val progressText: String,
+)
+
+val sampleAchievementBadges = listOf(
+    AchievementBadge(
+        "1",
+        "First 100 Reps",
+        "🥇",
+        true,
+        "Complete 100 total reps in workouts",
+        "100 / 100 Done"
+    ),
+    AchievementBadge(
+        "2",
+        "14-Day Streak Titan",
+        "🔥",
+        true,
+        "Maintain a 14-day workout streak",
+        "14 / 14 Days"
+    ),
+    AchievementBadge(
+        "3",
+        "Boss Battle Conqueror",
+        "👑",
+        true,
+        "Defeat a Boss Battle in Fitness Games",
+        "Boss Defeated"
+    ),
+    AchievementBadge(
+        "4",
+        "1,000 MP Coins Earner",
+        "🪙",
+        true,
+        "Earn 1,000 total MP Coins",
+        "1,250 MP Earned"
+    ),
+    AchievementBadge(
+        "5",
+        "50 Squat Speed Demon",
+        "⚡",
+        false,
+        "Complete 50 Squats in under 2 mins",
+        "40 / 50 Reps (80%)"
+    )
 )
 
 data class SocialHandleItem(
@@ -104,6 +157,7 @@ val socialHandlesList = listOf(
 
 @Composable
 fun ProfileScreen(
+    authRepository: AuthRepository? = null,
     onNavigateToSettings: () -> Unit = {},
     onNavigateToHelp: () -> Unit = {},
     onNavigateToDiagnostics: () -> Unit = {},
@@ -112,22 +166,20 @@ fun ProfileScreen(
     onLogout: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
-    // Header sizes (expanded big card -> compact pinned card)
-    val expandedHeaderHeight = 300.dp
+    val expandedHeaderHeight = 340.dp
     val collapsedHeaderHeight = 76.dp
     val density = LocalDensity.current
     val collapseRangePx = with(density) {
         (expandedHeaderHeight - collapsedHeaderHeight).toPx()
     }
 
-    // 0f = fully expanded, collapseRangePx = fully collapsed
     var collapsedPx by remember { mutableFloatStateOf(0f) }
     val collapseProgress = (collapsedPx / collapseRangePx).coerceIn(0f, 1f)
 
     val nestedScrollConnection = remember(collapseRangePx) {
         object : NestedScrollConnection {
-            // Scrolling DOWN the page (finger moves up): shrink the header first
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 val delta = available.y
                 if (delta >= 0f) return Offset.Zero
@@ -136,7 +188,6 @@ fun ProfileScreen(
                 return Offset(0f, -(collapsedPx - old))
             }
 
-            // Scrolling back UP: the list reaches the top first, then the header expands
             override fun onPostScroll(
                 consumed: Offset,
                 available: Offset,
@@ -155,11 +206,13 @@ fun ProfileScreen(
     var showFeedbackBottomSheet by remember { mutableStateOf(false) }
     var showRateDialog by remember { mutableStateOf(false) }
     var showFollowDialog by remember { mutableStateOf(false) }
+    var selectedBadgeDetail by remember { mutableStateOf<AchievementBadge?>(null) }
+    var showCompareDialog by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Ambient Glowing Background Pulsing Animation
     val infiniteTransition = rememberInfiniteTransition(label = "profilePulse")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.25f,
@@ -183,7 +236,6 @@ fun ProfileScreen(
             .fillMaxSize()
             .background(DarkBackground)
     ) {
-        // Glowing Background Orbs
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
@@ -229,13 +281,14 @@ fun ProfileScreen(
                     .fillMaxSize()
                     .nestedScroll(nestedScrollConnection)
             ) {
-                // Pinned header: big card -> small card (stays anchored at the top)
+                // Pinned Header with Level & XP Bar
                 Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
                     GlassCollapsibleProfileCard(
                         userName = "Alex Fitness",
                         userEmail = "alex.fitness@muscleplay.com",
                         membershipStatus = "Pro Member",
                         streakDays = 12,
+                        mpCoins = 1250,
                         collapseProgress = collapseProgress,
                         expandedHeight = expandedHeaderHeight,
                         collapsedHeight = collapsedHeaderHeight,
@@ -254,7 +307,15 @@ fun ProfileScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Progress Gallery Section
+                    // Task 2: Lifetime Athletic Trophies & Badges Section
+                    item {
+                        GlassTrophiesAndBadgesSection(
+                            badges = sampleAchievementBadges,
+                            onBadgeClick = { badge -> selectedBadgeDetail = badge }
+                        )
+                    }
+
+                    // Progress Gallery Section with Transformation Compare Button
                     item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -267,12 +328,22 @@ fun ProfileScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
                             )
-                            TextButton(onClick = { onNavigateToGallery() }) {
-                                Text(
-                                    "View All",
-                                    color = OrangeSecondary,
-                                    fontWeight = FontWeight.Bold
-                                )
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                TextButton(onClick = { showCompareDialog = true }) {
+                                    Text(
+                                        "Compare 🖼️",
+                                        color = OrangePrimary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                TextButton(onClick = { onNavigateToGallery() }) {
+                                    Text(
+                                        "View All",
+                                        color = OrangeSecondary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(4.dp))
@@ -308,6 +379,13 @@ fun ProfileScreen(
                                 title = "Settings & Preferences",
                                 subtitle = "Preferences, notifications, theme",
                                 onClick = { onNavigateToSettings() }
+                            )
+                            // Task 4: Export Workout Logs Report
+                            GlassProfileMenuItem(
+                                icon = Icons.Default.SaveAlt,
+                                title = "Export Workout Logs & Analytics",
+                                subtitle = "Download PDF report or CSV spreadsheet",
+                                onClick = { showExportDialog = true }
                             )
                             GlassProfileMenuItem(
                                 icon = Icons.Default.HealthAndSafety,
@@ -351,41 +429,298 @@ fun ProfileScreen(
                 }
             }
 
-            // Dialogs & Bottom Sheets
-            if (showLogoutDialog) {
+            // Trophy Detail Modal
+            selectedBadgeDetail?.let { badge ->
                 AlertDialog(
-                    onDismissRequest = { showLogoutDialog = false },
+                    onDismissRequest = { selectedBadgeDetail = null },
                     shape = RoundedCornerShape(28.dp),
                     containerColor = Color(0xFF181824),
+                    icon = {
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(OrangePrimary.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(badge.emoji, fontSize = 28.sp)
+                        }
+                    },
                     title = {
                         Text(
-                            text = "Logout",
-                            style = MaterialTheme.typography.titleLarge,
+                            badge.title,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                     },
                     text = {
-                        Text(
-                            text = "Are you sure you want to log out of MusclePlay?",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                "Criteria: ${badge.criteria}",
+                                color = Color.White.copy(alpha = 0.85f)
+                            )
+                            Text(
+                                "Progress: ${badge.progressText}",
+                                fontWeight = FontWeight.Bold,
+                                color = OrangeSecondary
+                            )
+                            Surface(
+                                color = if (badge.isUnlocked) Color(0xFF4CAF50).copy(alpha = 0.2f) else Color.White.copy(
+                                    alpha = 0.08f
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = if (badge.isUnlocked) "UNLOCKED 🎉" else "LOCKED 🔒",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (badge.isUnlocked) Color(0xFF4CAF50) else Color.White.copy(
+                                        alpha = 0.6f
+                                    ),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
                     },
                     confirmButton = {
-                        TextButton(
+                        Button(
                             onClick = {
-                                showLogoutDialog = false
-                                onLogout()
-                                snackbarMessage = "Logged out successfully"
-                            }
+                                selectedBadgeDetail = null
+                                snackbarMessage = "Sharing ${badge.title} badge..."
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
                         ) {
-                            Text("Logout", color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
+                            Text("Share Badge 📲", fontWeight = FontWeight.Bold)
                         }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showLogoutDialog = false }) {
+                        TextButton(onClick = { selectedBadgeDetail = null }) {
+                            Text("Close", color = Color.White.copy(alpha = 0.6f))
+                        }
+                    }
+                )
+            }
+
+            // Transformation Comparison Modal
+            if (showCompareDialog) {
+                var photo1 by remember { mutableStateOf(sampleProgressPhotos.first()) }
+                var photo2 by remember { mutableStateOf(sampleProgressPhotos.last()) }
+
+                AlertDialog(
+                    onDismissRequest = { showCompareDialog = false },
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = Color(0xFF181824),
+                    icon = {
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(OrangePrimary.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Compare,
+                                contentDescription = null,
+                                tint = OrangeSecondary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    },
+                    title = {
+                        Text(
+                            "Compare Transformation 🖼️",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(
+                                "Side-by-side milestone comparison:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                ComparePhotoPreviewCard("BEFORE", photo1, Modifier.weight(1f))
+                                ComparePhotoPreviewCard("AFTER", photo2, Modifier.weight(1f))
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showCompareDialog = false
+                                snackbarMessage = "Transformation comparison saved!"
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                        ) {
+                            Text("Done", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                )
+            }
+
+            // Export Workout Logs Modal
+            if (showExportDialog) {
+                AlertDialog(
+                    onDismissRequest = { showExportDialog = false },
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = Color(0xFF181824),
+                    icon = {
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(OrangePrimary.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.SaveAlt,
+                                contentDescription = null,
+                                tint = OrangeSecondary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    },
+                    title = {
+                        Text(
+                            "Export Workout Logs 💾",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                "Choose your preferred report export format:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+
+                            Button(
+                                onClick = {
+                                    showExportDialog = false
+                                    snackbarMessage = "PDF Report generated successfully! 📄"
+                                },
+                                modifier = Modifier.fillMaxWidth().height(46.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                            ) {
+                                Text("Export PDF Report 📄", fontWeight = FontWeight.Bold)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    showExportDialog = false
+                                    snackbarMessage = "CSV Spreadsheet exported successfully! 📊"
+                                },
+                                modifier = Modifier.fillMaxWidth().height(46.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    OrangeSecondary
+                                ),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeSecondary)
+                            ) {
+                                Text("Export CSV Spreadsheet 📊", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    },
+                    confirmButton = {},
+                    dismissButton = {
+                        TextButton(onClick = { showExportDialog = false }) {
                             Text("Cancel", color = Color.White.copy(alpha = 0.6f))
+                        }
+                    }
+                )
+            }
+
+            // Dark Glassmorphic 3-Option Logout Confirmation Dialog
+            if (showLogoutDialog) {
+                AlertDialog(
+                    onDismissRequest = { showLogoutDialog = false },
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = Color(0xFF181824),
+                    icon = {
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFFF5252).copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Logout,
+                                contentDescription = "Logout",
+                                tint = Color(0xFFFF5252),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    },
+                    title = {
+                        Text(
+                            text = "Logout Options 🚪",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(
+                                text = "Choose your preferred sign-out option:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+
+                            // Option 1: Logout from This Device
+                            Button(
+                                onClick = {
+                                    showLogoutDialog = false
+                                    coroutineScope.launch {
+                                        authRepository?.logout(logoutEverywhere = false)
+                                        onLogout()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252))
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.PhonelinkOff, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    Text("Logout from This Device 📱", fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+
+                            // Option 2: Logout from All Devices
+                            OutlinedButton(
+                                onClick = {
+                                    showLogoutDialog = false
+                                    coroutineScope.launch {
+                                        authRepository?.logout(logoutEverywhere = true)
+                                        onLogout()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, OrangeSecondary),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeSecondary)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.PublicOff, contentDescription = null, tint = OrangeSecondary, modifier = Modifier.size(18.dp))
+                                    Text("Logout from All Devices 🌐", fontWeight = FontWeight.Bold, color = OrangeSecondary)
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {},
+                    dismissButton = {
+                        TextButton(onClick = { showLogoutDialog = false }) {
+                            Text("Cancel", color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
                         }
                     }
                 )
@@ -442,7 +777,6 @@ fun ProfileScreen(
                                 color = Color.White.copy(alpha = 0.85f)
                             )
 
-                            // 5 Star Rating Preview Row
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -545,6 +879,367 @@ fun ProfileScreen(
 }
 
 @Composable
+fun GlassProgressGallerySection(
+    photos: List<ProgressPhoto>,
+    onImageClick: (ProgressPhoto) -> Unit,
+) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 2.dp)
+    ) {
+        items(photos, key = { it.id }) { photo ->
+            Surface(
+                onClick = { onImageClick(photo) },
+                shape = RoundedCornerShape(18.dp),
+                color = Color.White.copy(alpha = 0.08f),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    OrangePrimary.copy(alpha = 0.3f)
+                ),
+                modifier = Modifier.width(130.dp).height(120.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(OrangePrimary.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Image,
+                            contentDescription = null,
+                            tint = OrangePrimary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    Text(
+                        photo.title,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1
+                    )
+                    Text(
+                        photo.date,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = OrangeSecondary,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun GlassProfileMenuItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    tint: Color = OrangePrimary,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White.copy(alpha = 0.06f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(tint.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        icon,
+                        contentDescription = title,
+                        tint = tint,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                Column {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.65f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.4f)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GlassFeedbackBottomSheet(
+    onDismiss: () -> Unit,
+    onSubmit: (rating: Int, category: String, text: String) -> Unit,
+) {
+    var feedbackText by remember { mutableStateOf("") }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = Color(0xFF181824)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                "Tell Us What You Think 💬",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
+            )
+            Text(
+                "Your feedback directly shapes new features for MusclePlay!",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.7f)
+            )
+
+            OutlinedTextField(
+                value = feedbackText,
+                onValueChange = { feedbackText = it },
+                placeholder = {
+                    Text(
+                        "Describe your feedback or feature request...",
+                        color = Color.White.copy(alpha = 0.4f)
+                    )
+                },
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = OrangePrimary,
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
+                )
+            )
+
+            Button(
+                onClick = {
+                    if (feedbackText.isNotBlank()) {
+                        onSubmit(5, "General", feedbackText)
+                    }
+                },
+                enabled = feedbackText.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+            ) {
+                Text("Submit Feedback 🚀", fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+fun ProfileStatBadge(label: String, value: String) {
+    Surface(
+        color = Color.White.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.6f)
+            )
+            Text(
+                value,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = OrangeSecondary
+            )
+        }
+    }
+}
+
+@Composable
+private fun GlassTrophiesAndBadgesSection(
+    badges: List<AchievementBadge>,
+    onBadgeClick: (AchievementBadge) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Default.EmojiEvents,
+                    contentDescription = null,
+                    tint = OrangeSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    "Athletic Trophies & Badges 🏆",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+        }
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp)
+        ) {
+            items(badges, key = { it.id }) { badge ->
+                GlassBadgeCard(badge = badge, onClick = { onBadgeClick(badge) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlassBadgeCard(
+    badge: AchievementBadge,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = if (badge.isUnlocked) Color.White.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.04f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (badge.isUnlocked) OrangePrimary.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.10f)
+        ),
+        modifier = Modifier.width(100.dp).height(90.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(badge.emoji, fontSize = 18.sp)
+            Text(
+                badge.title,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                maxLines = 1,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Surface(
+                color = if (badge.isUnlocked) OrangeSecondary.copy(alpha = 0.25f) else Color.White.copy(
+                    alpha = 0.08f
+                ),
+                shape = RoundedCornerShape(6.dp)
+            ) {
+                Text(
+                    text = if (badge.isUnlocked) "Unlocked" else "Locked",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = if (badge.isUnlocked) OrangeSecondary else Color.White.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ComparePhotoPreviewCard(
+    label: String,
+    photo: ProgressPhoto,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = Color.White.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.3f)),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = OrangeSecondary
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(110.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(OrangePrimary.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Image,
+                    contentDescription = null,
+                    tint = OrangePrimary,
+                    modifier = Modifier.size(42.dp)
+                )
+            }
+            Text(
+                photo.title,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1
+            )
+            Text(
+                photo.date,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.6f)
+            )
+        }
+    }
+}
+
+@Composable
 private fun SocialHandleRowItem(
     item: SocialHandleItem,
     onClick: () -> Unit,
@@ -628,7 +1323,7 @@ fun GlassCollapsibleProfileCard(
     GlassContainer(
         modifier = Modifier
             .fillMaxWidth()
-            .height(cardHeight), // animates with scroll
+            .height(cardHeight),
         shape = RoundedCornerShape(cornerRadius)
     ) {
         Box(
@@ -638,7 +1333,6 @@ fun GlassCollapsibleProfileCard(
             contentAlignment = Alignment.Center
         ) {
             if (collapseProgress < 0.5f) {
-                // Expanded Full Card Layout
                 val alpha = (1f - (collapseProgress * 2f)).coerceIn(0f, 1f)
                 Column(
                     modifier = Modifier
@@ -668,7 +1362,7 @@ fun GlassCollapsibleProfileCard(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
                         text = userName,
@@ -683,11 +1377,57 @@ fun GlassCollapsibleProfileCard(
                         color = Color.White.copy(alpha = 0.7f)
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Task 1: Level 14 & XP Progress Bar
+                    val currentXp = 3450
+                    val targetXp = 5000
+                    Column(
+                        modifier = Modifier.fillMaxWidth(0.9f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                color = OrangePrimary.copy(alpha = 0.25f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "Level 14 • Muscle Titan 👑",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = OrangeSecondary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                            Text(
+                                text = "$currentXp / $targetXp XP",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.8f)
+                            )
+                        }
+
+                        LinearProgressIndicator(
+                            progress = { currentXp.toFloat() / targetXp },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = OrangePrimary,
+                            trackColor = Color.White.copy(alpha = 0.1f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Row(
@@ -696,18 +1436,11 @@ fun GlassCollapsibleProfileCard(
                         ) {
                             ProfileStatBadge(label = "Status", value = membershipStatus)
                             ProfileStatBadge(label = "Streak", value = "$streakDays Days 🔥")
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
                             ProfileStatBadge(label = "MP Coins", value = "$mpCoins MP 🪙")
                         }
                     }
                 }
             } else {
-                // Compact Header Layout (pinned at the top)
                 val alpha = ((collapseProgress - 0.5f) * 2f).coerceIn(0f, 1f)
                 Row(
                     modifier = Modifier
@@ -757,7 +1490,6 @@ fun GlassCollapsibleProfileCard(
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.weight(1f, fill = false)
                                 )
-                                // Membership status pill
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(50))
@@ -778,7 +1510,7 @@ fun GlassCollapsibleProfileCard(
                                 }
                             }
                             Text(
-                                text = "$userEmail • $streakDays Days 🔥 • $mpCoins MP 🪙",
+                                text = "Lvl 14 • $streakDays Days 🔥 • $mpCoins MP 🪙",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = OrangeSecondary,
                                 fontWeight = FontWeight.Bold,
@@ -801,371 +1533,8 @@ fun GlassCollapsibleProfileCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GlassFeedbackBottomSheet(
-    onDismiss: () -> Unit,
-    onSubmit: (isThumbsUp: Boolean?, rating: Int, feedbackText: String) -> Unit,
-) {
-    var isThumbsUp by remember { mutableStateOf<Boolean?>(true) }
-    var starRating by remember { mutableStateOf(5) }
-    var feedbackText by remember { mutableStateOf("") }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = Color(0xFF181824)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            // Header Title
-            Text(
-                text = "Tell us what you think",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-
-            // Q1: What do you think of MusclePlay? + Thumbs
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "What do you think of MusclePlay?",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    modifier = Modifier.weight(1f)
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Thumbs Up
-                    IconButton(
-                        onClick = { isThumbsUp = true },
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isThumbsUp == true) OrangePrimary
-                                else Color.White.copy(alpha = 0.1f)
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ThumbUp,
-                            contentDescription = "Thumbs Up",
-                            tint = Color.White
-                        )
-                    }
-
-                    // Thumbs Down
-                    IconButton(
-                        onClick = { isThumbsUp = false },
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isThumbsUp == false) Color(0xFFFF5252)
-                                else Color.White.copy(alpha = 0.1f)
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ThumbDown,
-                            contentDescription = "Thumbs Down",
-                            tint = Color.White
-                        )
-                    }
-                }
-            }
-
-            // Q2: How satisfied are you with this experience? + Stars
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "How satisfied are you with this experience?",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    (1..5).forEach { starIndex ->
-                        Icon(
-                            imageVector = if (starIndex <= starRating) Icons.Default.Star else Icons.Default.StarBorder,
-                            contentDescription = "Star $starIndex",
-                            tint = if (starIndex <= starRating) OrangeSecondary else Color.White.copy(
-                                alpha = 0.3f
-                            ),
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clickable { starRating = starIndex }
-                        )
-                    }
-                }
-            }
-
-            // Q3: How can we improve your experience? optional
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row {
-                    Text(
-                        text = "How can we improve your experience? ",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Text(
-                        text = "optional",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.5f)
-                    )
-                }
-
-                OutlinedTextField(
-                    value = feedbackText,
-                    onValueChange = { if (it.length <= 1000) feedbackText = it },
-                    placeholder = {
-                        Text(
-                            "Share details about your experience...",
-                            color = Color.White.copy(alpha = 0.4f)
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(110.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = OrangePrimary,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
-                    ),
-                    maxLines = 4
-                )
-
-                Text(
-                    text = "${feedbackText.length}/1,000",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.5f),
-                    modifier = Modifier.align(Alignment.End)
-                )
-            }
-
-            // Send Button
-            Button(
-                onClick = { onSubmit(isThumbsUp, starRating, feedbackText) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(26.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
-            ) {
-                Text(
-                    text = "Send",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-
-            // Footer Disclaimer
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = Color.White.copy(alpha = 0.06f)
-            ) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "Don't include personal information like your name, address, or phone number.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.7f)
-                    )
-                    Text(
-                        text = "By selecting Send, you give MusclePlay the right to use your feedback to improve its services.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.5f)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ProfileStatBadge(label: String, value: String) {
-    val isCoins = label == "MP Coins"
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        if (isCoins) {
-            Surface(
-                color = OrangeSecondary.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    OrangeSecondary.copy(alpha = 0.6f)
-                )
-            ) {
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = OrangeSecondary,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                )
-            }
-        } else {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = OrangeSecondary
-            )
-        }
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = Color.White.copy(alpha = 0.6f)
-        )
-    }
-}
-
-@Composable
-fun GlassProgressGallerySection(
-    photos: List<ProgressPhoto>,
-    onImageClick: (ProgressPhoto) -> Unit,
-) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        contentPadding = PaddingValues(horizontal = 2.dp)
-    ) {
-        items(photos) { photo ->
-            GlassContainer(
-                modifier = Modifier
-                    .width(140.dp)
-                    .height(160.dp)
-                    .clickable { onImageClick(photo) },
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Image,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = OrangePrimary
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = photo.title,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun GlassProfileMenuItem(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    tint: Color = OrangePrimary,
-    trailingBadge: String? = null,
-    onClick: () -> Unit,
-) {
-    GlassContainer(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(tint.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = tint,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.6f)
-                )
-            }
-
-            if (trailingBadge != null) {
-                Surface(
-                    color = OrangePrimary.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        OrangePrimary.copy(alpha = 0.5f)
-                    )
-                ) {
-                    Text(
-                        text = trailingBadge,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = OrangeSecondary,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.5f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun GlassContainer(
+fun GlassContainer(
     modifier: Modifier = Modifier,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(24.dp),
     content: @Composable () -> Unit,

@@ -30,10 +30,13 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.muscleplay.app.feature.auth.AuthRepository
+import com.muscleplay.app.feature.auth.AuthValidator
 import com.muscleplay.app.feature.onboarding.model.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 
 private val OrangePrimary = Color(0xFFFF5722)
 private val OrangeSecondary = Color(0xFFFF9800)
@@ -53,6 +56,7 @@ private val neonAvatarsList = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserProfileSetupScreen(
+    authRepository: AuthRepository? = null,
     onSetupComplete: (UserOnboardingProfile) -> Unit
 ) {
     val pagerState = rememberPagerState(pageCount = { 5 })
@@ -77,7 +81,8 @@ fun UserProfileSetupScreen(
     var isConfettiActive by remember { mutableStateOf(false) }
 
     // Step Validations
-    val isStep1Valid = fullNameText.trim().length >= 2
+    val fullNameError = AuthValidator.nameError(fullNameText)
+    val isStep1Valid = fullNameError == null
 
     val rawHeight = heightText.toDoubleOrNull() ?: 0.0
     val rawWeight = weightText.toDoubleOrNull() ?: 0.0
@@ -264,21 +269,23 @@ fun UserProfileSetupScreen(
                                                 Text("Full Name *", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
                                                 OutlinedTextField(
                                                     value = fullNameText,
-                                                    onValueChange = {
-                                                        fullNameText = it
-                                                        showNameError = false
+                                                    onValueChange = { input ->
+                                                        if (input.length <= AuthValidator.MAX_NAME_LENGTH) {
+                                                            fullNameText = input
+                                                            showNameError = false
+                                                        }
                                                     },
                                                     placeholder = { Text("e.g. Alex Johnson", color = Color.White.copy(alpha = 0.4f)) },
                                                     leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = OrangePrimary) },
                                                     modifier = Modifier.fillMaxWidth(),
                                                     shape = RoundedCornerShape(16.dp),
                                                     singleLine = true,
-                                                    isError = showNameError || (fullNameText.isNotEmpty() && !isStep1Valid),
+                                                    isError = fullNameError != null && (showNameError || fullNameText.isNotEmpty()),
                                                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                                                     colors = inputColors()
                                                 )
-                                                if (!isStep1Valid && (showNameError || fullNameText.isNotEmpty())) {
-                                                    Text("Please enter a valid full name (at least 2 characters)", style = MaterialTheme.typography.labelSmall, color = Color(0xFFFF5252))
+                                                if (fullNameError != null && (showNameError || fullNameText.isNotEmpty())) {
+                                                    Text(fullNameError, style = MaterialTheme.typography.labelSmall, color = Color(0xFFFF5252))
                                                 }
                                             }
 
@@ -780,10 +787,11 @@ fun UserProfileSetupScreen(
                                     pagerState.animateScrollToPage(pagerState.currentPage + 1)
                                 }
                             } else {
-                                // Step 5: Celebration Confetti Burst before completing setup
+                                // Step 5: Celebration Confetti Burst & Submit Profile to Backend
                                 isConfettiActive = true
                                 coroutineScope.launch {
-                                    delay(1400L)
+                                    authRepository?.submitProfileCompletion(currentProfile)
+                                    delay(1400L.milliseconds)
                                     onSetupComplete(currentProfile)
                                 }
                             }

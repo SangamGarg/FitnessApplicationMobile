@@ -208,7 +208,7 @@ fun SplashScreen(
                 border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.3f))
             ) {
                 Text(
-                    text = "MusclePlay v1.0.0 • Build 104 • AI Engine Ready",
+                    text = "MusclePlay AI Engine Ready",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.7f),
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)

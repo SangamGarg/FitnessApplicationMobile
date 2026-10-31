@@ -51,8 +51,11 @@ kotlin {
             implementation(libs.androidx.camera.lifecycle)
             implementation(libs.androidx.camera.view)
             implementation(libs.androidx.activity.compose)
+            implementation("androidx.security:security-crypto:1.1.0-alpha06")
+            implementation("com.google.firebase:firebase-auth:23.2.0")
         }
         commonMain.dependencies {
+            implementation(libs.firebase.kmp.auth)
             implementation(libs.androidx.navigation.compose)
             implementation(libs.compose.material.icons.extended)
             implementation(libs.compose.runtime)

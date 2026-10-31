@@ -1,12 +1,31 @@
 package com.muscleplay.app.feature.auth
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,8 +37,24 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MarkEmailRead
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -37,8 +72,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.muscleplay.app.core.network.NetworkResult
 import com.muscleplay.app.core.ui.BackHandler
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 private val OrangePrimary = Color(0xFFFF5722)
@@ -46,14 +83,16 @@ private val OrangeSecondary = Color(0xFFFF9800)
 private val OrangeGlow = Color(0xFFFF3D00)
 private val DarkBackground = Color(0xFF0F0F17)
 
-private const val RESEND_TIMER_SECONDS = 60;
+private const val RESEND_TIMER_SECONDS = 60
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun OtpVerificationScreen(
-    userEmail: String = "user@muscleplay.com",
+    userEmail: String = "",
+    userPassword: String = "",
+    authRepository: AuthRepository? = null,
     onOtpVerified: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
 
     var otpText by remember { mutableStateOf("") }
@@ -66,14 +105,13 @@ fun OtpVerificationScreen(
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
-    // Focuses the hidden OTP field AND forces the keyboard to show.
     fun openKeyboard() {
         focusRequester.requestFocus()
         keyboardController?.show()
     }
 
-    // Don't let the user leave the screen while the code is being verified
     BackHandler(enabled = isVerifying) {
         snackbarMessage = "Please wait while we verify your code..."
     }
@@ -95,30 +133,65 @@ fun OtpVerificationScreen(
         }
     }
 
-    // Auto focus OTP field on entrance and open the keyboard
+    // Send OTP API call on entrance
     LaunchedEffect(Unit) {
+        authRepository?.sendSignupOtp(userEmail)
         delay(300L.milliseconds)
         openKeyboard()
     }
 
-    // Ambient Glowing Background Pulsing Animation
+    fun handleVerifyOtp() {
+        if (otpText.length != 6 || isVerifying) return
+        keyboardController?.hide()
+        isVerifying = true
+        errorMessage = null
+        coroutineScope.launch {
+            val verifyResult = authRepository?.verifySignupOtp(userEmail, otpText)
+            if (verifyResult is NetworkResult.Error) {
+                isVerifying = false
+                errorMessage = verifyResult.message
+                snackbarHostState.showSnackbar(verifyResult.message)
+                // Retain digits on failure - DO NOT clear
+            } else if (verifyResult is NetworkResult.Exception) {
+                isVerifying = false
+                val netErr = "Network connection failed. Please try again."
+                errorMessage = netErr
+                snackbarHostState.showSnackbar(netErr)
+                // Retain digits on failure - DO NOT clear
+            } else {
+                // Post-Verification (HTTP 200 Success): proceed to loginRegister
+                val authResult = authRepository?.authenticateWithEmail(
+                    userEmail, userPassword, isSignUp = true
+                )
+                isVerifying = false
+                if (authResult is NetworkResult.Error) {
+                    snackbarHostState.showSnackbar(authResult.message)
+                } else if (authResult is NetworkResult.Exception) {
+                    snackbarHostState.showSnackbar("Connection failed during account registration.")
+                } else {
+                    onOtpVerified()
+                }
+            }
+        }
+    }
+
+    // Auto-Submit on Complete Input (6 Digits)
+    LaunchedEffect(otpText) {
+        if (otpText.length == 6 && !isVerifying && errorMessage == null) {
+            handleVerifyOtp()
+        }
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "otpPulse")
     val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 0.45f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "otpPulse"
+        initialValue = 0.25f, targetValue = 0.45f, animationSpec = infiniteRepeatable(
+            animation = tween(3500, easing = LinearEasing), repeatMode = RepeatMode.Reverse
+        ), label = "otpPulse"
     )
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DarkBackground)
+        modifier = Modifier.fillMaxSize().background(DarkBackground)
     ) {
-        // Glowing Ambient Orbs
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
@@ -131,52 +204,42 @@ fun OtpVerificationScreen(
             )
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(OrangeSecondary.copy(alpha = pulseAlpha * 0.6f), Color.Transparent),
-                    center = Offset(w * 0.15f, h * 0.85f),
-                    radius = w * 0.6f
+                    colors = listOf(
+                        OrangeSecondary.copy(alpha = pulseAlpha * 0.6f), Color.Transparent
+                    ), center = Offset(w * 0.15f, h * 0.85f), radius = w * 0.6f
                 )
             )
         }
 
         Scaffold(
             containerColor = Color.Transparent,
-            snackbarHost = { SnackbarHost(snackbarHostState) }
-        ) { innerPadding ->
+            snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
+                modifier = Modifier.fillMaxSize().padding(innerPadding)
                     .consumeWindowInsets(innerPadding)
             ) {
-                // Main content: centered when there's room, scrollable when the keyboard is open
                 BoxWithConstraints(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = 56.dp) // keeps content clear of the back button
-                        .imePadding()
+                    modifier = Modifier.fillMaxSize().padding(top = 56.dp).imePadding()
                 ) {
                     val viewportHeight = maxHeight
 
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
+                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                             .padding(horizontal = 16.dp)
                     ) {
                         Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = viewportHeight),
+                            modifier = Modifier.fillMaxWidth().heightIn(min = viewportHeight),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            // Header Icon & Title
                             Box(
-                                modifier = Modifier
-                                    .size(80.dp)
-                                    .clip(CircleShape)
-                                    .background(Brush.linearGradient(listOf(OrangePrimary, OrangeSecondary))),
-                                contentAlignment = Alignment.Center
+                                modifier = Modifier.size(80.dp).clip(CircleShape).background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            OrangePrimary, OrangeSecondary
+                                        )
+                                    )
+                                ), contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.MarkEmailRead,
@@ -189,7 +252,7 @@ fun OtpVerificationScreen(
                             Spacer(modifier = Modifier.height(20.dp))
 
                             Text(
-                                text = "Verify Your Email ✉️",
+                                text = "Verify Email OTP",
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color.White
@@ -198,35 +261,30 @@ fun OtpVerificationScreen(
                             Spacer(modifier = Modifier.height(8.dp))
 
                             Text(
-                                text = "We sent a 6-digit verification code to",
+                                text = "Enter the 6-digit verification code sent to",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.7f)
+                                color = Color.White.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center
                             )
+
+                            Spacer(modifier = Modifier.height(2.dp))
+
                             Text(
                                 text = userEmail,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = OrangeSecondary
+                                color = OrangeSecondary,
+                                textAlign = TextAlign.Center
                             )
 
                             Spacer(modifier = Modifier.height(28.dp))
 
-                            // Glass Card containing Segmented 6-Digit OTP Field
                             GlassCardContainer {
                                 Column(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
+                                    modifier = Modifier.padding(22.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(20.dp)
                                 ) {
-                                    Text(
-                                        text = "Enter 6-Digit Code",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = OrangePrimary,
-                                        letterSpacing = 1.2.sp
-                                    )
-
-                                    // 6-Digit Segmented Responsive Input Boxes
                                     Box(
                                         modifier = Modifier.fillMaxWidth(),
                                         contentAlignment = Alignment.Center
@@ -234,59 +292,70 @@ fun OtpVerificationScreen(
                                         BasicTextField(
                                             value = otpText,
                                             onValueChange = { newValue ->
-                                                val filtered = newValue.filter { it.isDigit() }.take(6)
+                                                val filtered =
+                                                    newValue.filter { it.isDigit() }.take(6)
                                                 otpText = filtered
+                                                // Reset error state immediately on edit/backspace
                                                 errorMessage = null
                                                 if (filtered.length == 6) {
                                                     keyboardController?.hide()
-                                                    isVerifying = true
                                                 }
                                             },
                                             enabled = !isVerifying,
                                             textStyle = TextStyle(color = Color.Transparent),
                                             cursorBrush = SolidColor(Color.Transparent),
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                            modifier = Modifier
-                                                .focusRequester(focusRequester)
+                                            modifier = Modifier.focusRequester(focusRequester)
                                                 .size(1.dp)
                                         )
 
                                         Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable(
-                                                    interactionSource = remember { MutableInteractionSource() },
-                                                    indication = null,
-                                                    enabled = !isVerifying
-                                                ) { openKeyboard() },
+                                            modifier = Modifier.fillMaxWidth().clickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = null,
+                                                enabled = !isVerifying
+                                            ) { openKeyboard() },
                                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             (0 until 6).forEach { index ->
-                                                val char = otpText.getOrNull(index)?.toString() ?: ""
+                                                val char =
+                                                    otpText.getOrNull(index)?.toString() ?: ""
                                                 val isFocused =
                                                     otpText.length == index || (index == 5 && otpText.length == 6)
 
                                                 Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .height(52.dp)
-                                                        .clip(RoundedCornerShape(12.dp))
-                                                        .background(
-                                                            if (char.isNotEmpty()) OrangePrimary.copy(alpha = 0.15f)
-                                                            else Color.White.copy(alpha = 0.08f)
-                                                        )
-                                                        .border(
-                                                            width = if (isFocused) 2.dp else 1.dp,
+                                                    modifier = Modifier.weight(1f).height(52.dp)
+                                                        .clip(RoundedCornerShape(12.dp)).background(
+                                                            when {
+                                                                errorMessage != null -> Color(
+                                                                    0xFFFF5252
+                                                                ).copy(alpha = 0.12f)
+
+                                                                char.isNotEmpty() -> OrangePrimary.copy(
+                                                                    alpha = 0.15f
+                                                                )
+
+                                                                else -> Color.White.copy(alpha = 0.08f)
+                                                            }
+                                                        ).border(
+                                                            width = if (isFocused || errorMessage != null) 2.dp else 1.dp,
                                                             color = when {
-                                                                errorMessage != null -> Color(0xFFFF5252)
+                                                                errorMessage != null -> Color(
+                                                                    0xFFFF5252
+                                                                )
+
                                                                 isFocused -> OrangePrimary
-                                                                char.isNotEmpty() -> OrangeSecondary.copy(alpha = 0.7f)
+                                                                char.isNotEmpty() -> OrangeSecondary.copy(
+                                                                    alpha = 0.7f
+                                                                )
+
                                                                 else -> Color.White.copy(alpha = 0.2f)
                                                             },
                                                             shape = RoundedCornerShape(12.dp)
-                                                        ),
-                                                    contentAlignment = Alignment.Center
+                                                        ).clickable(enabled = !isVerifying) {
+                                                            openKeyboard()
+                                                        }, contentAlignment = Alignment.Center
                                                 ) {
                                                     Text(
                                                         text = char,
@@ -299,7 +368,6 @@ fun OtpVerificationScreen(
                                         }
                                     }
 
-                                    // Inline Error State
                                     errorMessage?.let { error ->
                                         Text(
                                             text = error,
@@ -310,7 +378,6 @@ fun OtpVerificationScreen(
                                         )
                                     }
 
-                                    // Countdown Timer & Resend Option
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.Center
@@ -339,55 +406,42 @@ fun OtpVerificationScreen(
                                                 fontWeight = FontWeight.ExtraBold,
                                                 color = OrangePrimary,
                                                 modifier = Modifier.clickable(enabled = !isVerifying) {
+                                                    coroutineScope.launch {
+                                                        authRepository?.sendSignupOtp(userEmail)
+                                                    }
                                                     timerSeconds = RESEND_TIMER_SECONDS
                                                     canResend = false
                                                     otpText = ""
                                                     errorMessage = null
-                                                    snackbarMessage = "New 6-digit OTP code sent to $userEmail"
+                                                    snackbarMessage =
+                                                        "New OTP code sent to $userEmail"
                                                     openKeyboard()
-                                                }
-                                            )
+                                                })
                                         }
                                     }
 
-                                    // Verify & Continue Button
                                     Button(
-                                        onClick = {
-                                            if (otpText.length < 6) {
-                                                errorMessage = "Please enter all 6 digits."
-                                            } else {
-                                                keyboardController?.hide()
-                                                isVerifying = true
-                                            }
-                                        },
-                                        enabled = !isVerifying,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(52.dp),
+                                        onClick = { handleVerifyOtp() },
+                                        enabled = otpText.length == 6 && !isVerifying,
+                                        modifier = Modifier.fillMaxWidth().height(52.dp),
                                         shape = RoundedCornerShape(26.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = OrangePrimary,
+                                            disabledContainerColor = Color.White.copy(alpha = 0.12f)
+                                        )
                                     ) {
                                         if (isVerifying) {
-                                            LaunchedEffect(Unit) {
-                                                delay(1200L.milliseconds)
-                                                isVerifying = false
-                                                if (otpText == "123456" || otpText.length == 6) {
-                                                    onOtpVerified()
-                                                } else {
-                                                    errorMessage = "Invalid verification code. Please try again."
-                                                }
-                                            }
                                             CircularProgressIndicator(
-                                                modifier = Modifier.size(24.dp),
+                                                modifier = Modifier.size(22.dp),
                                                 color = Color.White,
-                                                strokeWidth = 2.5.dp
+                                                strokeWidth = 2.dp
                                             )
                                         } else {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text(
-                                                    text = "Verify & Continue",
+                                                    text = "Verify OTP & Continue",
                                                     style = MaterialTheme.typography.titleMedium,
-                                                    fontWeight = FontWeight.Bold,
+                                                    fontWeight = FontWeight.ExtraBold,
                                                     color = Color.White
                                                 )
                                                 Spacer(modifier = Modifier.width(8.dp))
@@ -405,49 +459,39 @@ fun OtpVerificationScreen(
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // Notice
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(OrangeSecondary.copy(alpha = 0.12f))
-                                    .border(
-                                        width = 1.dp,
-                                        color = OrangeSecondary.copy(alpha = 0.35f),
-                                        shape = RoundedCornerShape(14.dp)
-                                    )
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                modifier = Modifier.clip(RoundedCornerShape(12.dp))
+                                    .background(Color.White.copy(alpha = 0.05f))
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Info,
                                     contentDescription = null,
                                     tint = OrangeSecondary,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Kindly do not press back or close the app while your code is being verified.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White.copy(alpha = 0.85f)
+                                    text = "Check your spam or junk folder if you can't find the email.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White.copy(alpha = 0.6f)
                                 )
                             }
                         }
                     }
                 }
 
-                // Back button
                 IconButton(
                     onClick = onBack,
                     enabled = !isVerifying,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = 8.dp, top = 8.dp)
+                    modifier = Modifier.padding(start = 12.dp, top = 12.dp).size(40.dp)
+                        .clip(CircleShape).background(Color.White.copy(alpha = 0.08f))
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = if (isVerifying) Color.White.copy(alpha = 0.3f) else Color.White
+                        tint = Color.White
                     )
                 }
             }
@@ -458,31 +502,24 @@ fun OtpVerificationScreen(
 @Composable
 private fun GlassCardContainer(
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.12f),
-                        Color.White.copy(alpha = 0.04f)
-                    )
+        modifier = modifier.clip(RoundedCornerShape(24.dp)).background(
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.12f), Color.White.copy(alpha = 0.04f)
                 )
             )
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.35f),
-                        OrangePrimary.copy(alpha = 0.25f),
-                        Color.White.copy(alpha = 0.08f)
-                    )
-                ),
-                shape = RoundedCornerShape(24.dp)
-            )
+        ).border(
+            width = 1.dp, brush = Brush.linearGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.35f),
+                    OrangePrimary.copy(alpha = 0.25f),
+                    Color.White.copy(alpha = 0.08f)
+                )
+            ), shape = RoundedCornerShape(24.dp)
+        )
     ) {
         content()
     }

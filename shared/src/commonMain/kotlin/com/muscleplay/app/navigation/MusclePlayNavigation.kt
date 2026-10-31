@@ -35,6 +35,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.muscleplay.app.core.di.AppContainer
 import com.muscleplay.app.feature.auth.OtpVerificationScreen
+import com.muscleplay.app.feature.auth.ResetPasswordScreen
 import com.muscleplay.app.feature.auth.SignInScreen
 import com.muscleplay.app.feature.auth.SignUpScreen
 import com.muscleplay.app.feature.calculators.CalculatorsScreen
@@ -72,6 +73,7 @@ private object Routes {
     const val SIGN_UP = "sign_up"
     const val OTP_VERIFICATION = "otp_verification"
     const val USER_PROFILE_SETUP = "user_profile_setup"
+    const val RESET_PASSWORD = "reset_password"
 
     const val DIET_HOME = "diet_home"
     const val INGREDIENT_SCANNER = "ingredient_scanner"
@@ -137,6 +139,7 @@ fun MusclePlayNavigation(
         Routes.SIGN_UP,
         Routes.OTP_VERIFICATION,
         Routes.USER_PROFILE_SETUP,
+        Routes.RESET_PASSWORD,
         Routes.INGREDIENT_SCANNER,
         Routes.SQUAT_MASTER_ROUTE,
         Routes.REP_CHALLENGE_ROUTE,
@@ -160,7 +163,9 @@ fun MusclePlayNavigation(
     }
 
     val shouldHideBottomBar =
-        isWorkoutSessionActive || currentRoute in bottomBarHiddenRoutes || currentRoute?.startsWith(Routes.OTP_VERIFICATION) == true
+        isWorkoutSessionActive || currentRoute in bottomBarHiddenRoutes || currentRoute?.startsWith(
+            Routes.OTP_VERIFICATION
+        ) == true || currentRoute?.startsWith(Routes.RESET_PASSWORD) == true
 
     val selectedIndex = remember(currentDestination) {
         val activeRoute = tabs.firstOrNull { tab ->
@@ -185,12 +190,9 @@ fun MusclePlayNavigation(
     } else 0f
 
     val animatedCenterX by animateFloatAsState(
-        targetValue = targetCenterX,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "animatedCenterX"
+        targetValue = targetCenterX, animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow
+        ), label = "animatedCenterX"
     )
 
     val bumpShape =
@@ -204,35 +206,31 @@ fun MusclePlayNavigation(
         }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DarkBackground)
+        modifier = Modifier.fillMaxSize().background(DarkBackground)
     ) {
         NavHost(
             navController = navController,
             startDestination = Routes.SPLASH,
-            modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.navigationBars)
+            modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars)
                 .statusBarsPadding()
         ) {
             composable(Routes.SPLASH) {
                 SplashScreen(
                     onSplashFinished = {
-                        val destination = if (onboardingPreferences.isOnboardingCompleted()) {
-                            //TODO
-                            Routes.SIGN_IN
-                            //Routes.HOME
-                        } else {
-                            Routes.ONBOARDING
+                        val tokenStorage = appContainer.authRepository.tokenStorageManager
+                        val isLoggedIn = !tokenStorage.accessToken.isNullOrBlank()
+                        val destination = when {
+                            isLoggedIn && tokenStorage.isProfileComplete -> Routes.HOME
+                            isLoggedIn && !tokenStorage.isProfileComplete -> Routes.USER_PROFILE_SETUP
+                            onboardingPreferences.isOnboardingCompleted() -> Routes.SIGN_IN
+                            else -> Routes.ONBOARDING
                         }
                         navController.navigate(destination) {
                             popUpTo(Routes.SPLASH) {
                                 inclusive = true
                             }
                         }
-                    }
-                )
+                    })
             }
             composable(Routes.ONBOARDING) {
                 OnboardingScreen(
@@ -243,13 +241,15 @@ fun MusclePlayNavigation(
                                 inclusive = true
                             }
                         }
-                    }
-                )
+                    })
             }
             composable(Routes.SIGN_IN) {
                 SignInScreen(
-                    onSignInSuccess = {
-                        navController.navigate(Routes.HOME) {
+                    authRepository = appContainer.authRepository,
+                    onSignInSuccess = { isProfileComplete ->
+                        val destination =
+                            if (isProfileComplete) Routes.HOME else Routes.USER_PROFILE_SETUP
+                        navController.navigate(destination) {
                             popUpTo(Routes.SIGN_IN) {
                                 inclusive = true
                             }
@@ -257,26 +257,21 @@ fun MusclePlayNavigation(
                     },
                     onNavigateToSignUp = {
                         navController.navigate(Routes.SIGN_UP)
-                    }
-                )
-            }
-            composable(Routes.SIGN_UP) {
-                SignUpScreen(
-                    onNavigateToOtp = { email ->
-                        navController.navigate("${Routes.OTP_VERIFICATION}/$email")
                     },
-                    onNavigateToSignIn = {
-                        navController.popBackStack()
+                    onNavigateToResetPassword = { email, token ->
+                        navController.navigate("${Routes.RESET_PASSWORD}/$email/$token")
                     }
                 )
             }
-            composable("${Routes.OTP_VERIFICATION}/{email}") { backStackEntry ->
-                val userEmail =
-                    backStackEntry.savedStateHandle.get<String>("email") ?: "user@muscleplay.com"
-                OtpVerificationScreen(
+            composable("${Routes.RESET_PASSWORD}/{email}/{token}") { backStackEntry ->
+                val userEmail = backStackEntry.savedStateHandle.get<String>("email") ?: ""
+                val verificationToken = backStackEntry.savedStateHandle.get<String>("token") ?: ""
+                ResetPasswordScreen(
                     userEmail = userEmail,
-                    onOtpVerified = {
-                        navController.navigate(Routes.USER_PROFILE_SETUP) {
+                    verificationToken = verificationToken,
+                    authRepository = appContainer.authRepository,
+                    onResetSuccess = {
+                        navController.navigate(Routes.SIGN_IN) {
                             popUpTo(Routes.SIGN_IN) {
                                 inclusive = true
                             }
@@ -287,16 +282,44 @@ fun MusclePlayNavigation(
                     }
                 )
             }
+            composable(Routes.SIGN_UP) {
+                SignUpScreen(onNavigateToOtp = { email, password ->
+                    navController.navigate("${Routes.OTP_VERIFICATION}/$email/$password")
+                }, onNavigateToSignIn = {
+                    navController.popBackStack()
+                })
+            }
+            composable("${Routes.OTP_VERIFICATION}/{email}/{password}") { backStackEntry ->
+                val userEmail = backStackEntry.savedStateHandle.get<String>("email") ?: ""
+                val userPassword = backStackEntry.savedStateHandle.get<String>("password") ?: ""
+                OtpVerificationScreen(
+                    userEmail = userEmail,
+                    userPassword = userPassword,
+                    authRepository = appContainer.authRepository,
+                    onOtpVerified = {
+                        val isProfileComplete =
+                            appContainer.authRepository.tokenStorageManager.isProfileComplete
+                        val destination =
+                            if (isProfileComplete) Routes.HOME else Routes.USER_PROFILE_SETUP
+                        navController.navigate(destination) {
+                            popUpTo(Routes.SIGN_IN) {
+                                inclusive = true
+                            }
+                        }
+                    },
+                    onBack = {
+                        navController.popBackStack()
+                    })
+            }
             composable(Routes.USER_PROFILE_SETUP) {
                 UserProfileSetupScreen(
-                    onSetupComplete = {
+                    authRepository = appContainer.authRepository, onSetupComplete = {
                         navController.navigate(Routes.HOME) {
                             popUpTo(Routes.USER_PROFILE_SETUP) {
                                 inclusive = true
                             }
                         }
-                    }
-                )
+                    })
             }
             composable(Routes.HOME) {
                 HomeScreen(
@@ -306,29 +329,24 @@ fun MusclePlayNavigation(
                     onNavigateToCalculators = { navController.navigate(Routes.CALCULATORS) },
                     onNavigateToProfile = { navController.navigate(Routes.PROFILE) },
                     onNavigateToScanner = { navController.navigate(Routes.INGREDIENT_SCANNER) },
-                    onNavigateToCoinsHub = { navController.navigate(Routes.PROFILE_COIN_REDEMPTION) }
-                )
+                    onNavigateToCoinsHub = { navController.navigate(Routes.PROFILE_COIN_REDEMPTION) })
             }
             composable(Routes.DIET_HOME) {
                 DietHomeScreen(
                     mealDao = appContainer.mealDao,
                     onNavigateToScanner = { navController.navigate(Routes.INGREDIENT_SCANNER) },
-                    onBack = { navController.popBackStack() }
-                )
+                    onBack = { navController.popBackStack() })
             }
             composable(Routes.INGREDIENT_SCANNER) {
                 IngredientScannerScreen(
-                    mealDao = appContainer.mealDao,
-                    onBack = { navController.popBackStack() }
-                )
+                    mealDao = appContainer.mealDao, onBack = { navController.popBackStack() })
             }
             composable(Routes.WORKOUTS) {
                 WorkoutScreen(
                     repository = appContainer.workoutRepository,
                     onActiveSessionStateChange = { isActive ->
                         isWorkoutSessionActive = isActive
-                    }
-                )
+                    })
             }
             composable(Routes.GAMES) {
                 GamesScreen(
@@ -357,97 +375,85 @@ fun MusclePlayNavigation(
             }
             composable(Routes.PROFILE) {
                 ProfileScreen(
+                    authRepository = appContainer.authRepository,
                     onNavigateToSettings = { navController.navigate(Routes.PROFILE_SETTINGS) },
                     onNavigateToHelp = { navController.navigate(Routes.PROFILE_HELP) },
                     onNavigateToDiagnostics = { navController.navigate(Routes.PROFILE_DIAGNOSTICS) },
                     onNavigateToGallery = { navController.navigate(Routes.PROFILE_GALLERY) },
-                    onNavigateToCoinRedemption = { navController.navigate(Routes.PROFILE_COIN_REDEMPTION) }
+                    onNavigateToCoinRedemption = { navController.navigate(Routes.PROFILE_COIN_REDEMPTION) },
+                    onLogout = {
+                        navController.navigate(Routes.SIGN_IN) {
+                            popUpTo(Routes.HOME) {
+                                inclusive = true
+                            }
+                        }
+                    }
                 )
             }
             composable(Routes.PROFILE_COIN_REDEMPTION) {
                 MpCoinsHubScreen(
                     onBack = {
                         navController.popBackStack()
-                    }
-                )
+                    })
             }
             composable(Routes.PROFILE_GALLERY) {
                 FullPhotoGalleryScreen(
                     onBack = {
                         navController.popBackStack()
-                    }
-                )
+                    })
             }
             composable(Routes.PROFILE_DIAGNOSTICS) {
                 SelfDiagnosticsScreen(
                     onBack = {
                         navController.popBackStack()
-                    }
-                )
+                    })
             }
             composable(Routes.PROFILE_HELP) {
-                HelpSupportScreen(
-                    onBack = {
-                        navController.popBackStack()
-                    },
-                    onNavigateToAiBot = {
-                        navController.navigate(Routes.PROFILE_AI_BOT)
-                    },
-                    onNavigateToEmailSupport = {
-                        navController.navigate(Routes.PROFILE_EMAIL_SUPPORT)
-                    },
-                    onNavigateToRaiseTicket = {
-                        navController.navigate(Routes.PROFILE_RAISE_TICKET)
-                    },
-                    onNavigateToMyTickets = {
-                        navController.navigate(Routes.PROFILE_MY_TICKETS)
-                    }
-                )
+                HelpSupportScreen(onBack = {
+                    navController.popBackStack()
+                }, onNavigateToAiBot = {
+                    navController.navigate(Routes.PROFILE_AI_BOT)
+                }, onNavigateToEmailSupport = {
+                    navController.navigate(Routes.PROFILE_EMAIL_SUPPORT)
+                }, onNavigateToRaiseTicket = {
+                    navController.navigate(Routes.PROFILE_RAISE_TICKET)
+                }, onNavigateToMyTickets = {
+                    navController.navigate(Routes.PROFILE_MY_TICKETS)
+                })
             }
             composable(Routes.PROFILE_EMAIL_SUPPORT) {
                 EmailSupportScreen(
                     onBack = {
                         navController.popBackStack()
-                    }
-                )
+                    })
             }
             composable(Routes.PROFILE_AI_BOT) {
-                AiBotSupportScreen(
-                    onBack = {
-                        navController.popBackStack()
-                    },
-                    onNavigateRoute = { route ->
-                        navController.navigate(route)
-                    }
-                )
+                AiBotSupportScreen(onBack = {
+                    navController.popBackStack()
+                }, onNavigateRoute = { route ->
+                    navController.navigate(route)
+                })
             }
             composable(Routes.PROFILE_SETTINGS) {
                 SettingsScreen(
                     onBack = {
                         navController.popBackStack()
-                    }
-                )
+                    })
             }
             composable(Routes.PROFILE_RAISE_TICKET) {
-                RaiseTicketScreen(
-                    onBack = {
-                        navController.popBackStack()
-                    },
-                    onViewTickets = {
-                        navController.popBackStack()
-                        navController.navigate(Routes.PROFILE_MY_TICKETS)
-                    }
-                )
+                RaiseTicketScreen(onBack = {
+                    navController.popBackStack()
+                }, onViewTickets = {
+                    navController.popBackStack()
+                    navController.navigate(Routes.PROFILE_MY_TICKETS)
+                })
             }
             composable(Routes.PROFILE_MY_TICKETS) {
-                MyTicketsScreen(
-                    onBack = {
-                        navController.popBackStack()
-                    },
-                    onRaiseTicket = {
-                        navController.navigate(Routes.PROFILE_RAISE_TICKET)
-                    }
-                )
+                MyTicketsScreen(onBack = {
+                    navController.popBackStack()
+                }, onRaiseTicket = {
+                    navController.navigate(Routes.PROFILE_RAISE_TICKET)
+                })
             }
             composable(Routes.REP_CHALLENGE_ROUTE) {
                 RepChallengeScreen(
@@ -472,38 +478,28 @@ fun MusclePlayNavigation(
         // Floating Glass App Bottom Bar
         if (!shouldHideBottomBar) {
             Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
-                    .onGloballyPositioned { barWidthPx = it.size.width.toFloat() }
-                    .clip(bumpShape)
+                    .onGloballyPositioned { barWidthPx = it.size.width.toFloat() }.clip(bumpShape)
                     .background(
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color(0xEE1A1A26),
-                                Color(0xEE12121B)
+                                Color(0xEE1A1A26), Color(0xEE12121B)
                             )
-                        ),
-                        shape = bumpShape
-                    )
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.linearGradient(
+                        ), shape = bumpShape
+                    ).border(
+                        width = 1.dp, brush = Brush.linearGradient(
                             colors = listOf(
                                 Color.White.copy(alpha = 0.35f),
                                 OrangePrimary.copy(alpha = 0.3f),
                                 Color.White.copy(alpha = 0.08f)
                             )
-                        ),
-                        shape = bumpShape
+                        ), shape = bumpShape
                     )
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(58.dp)
+                    modifier = Modifier.fillMaxWidth().height(58.dp)
                         .padding(horizontal = tabRowInset),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceAround
@@ -518,22 +514,18 @@ fun MusclePlayNavigation(
                         )
 
                         Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    navController.navigate(tab.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = true
-                                        }
-                                        launchSingleTop = true
-                                        restoreState = true
+                            modifier = Modifier.weight(1f).fillMaxHeight().clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                navController.navigate(tab.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
                                     }
-                                },
-                            contentAlignment = Alignment.Center
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }, contentAlignment = Alignment.Center
                         ) {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -542,15 +534,12 @@ fun MusclePlayNavigation(
                             ) {
                                 if (selected) {
                                     Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
+                                        modifier = Modifier.size(40.dp).clip(CircleShape)
                                             .background(
                                                 brush = Brush.linearGradient(
                                                     colors = listOf(OrangePrimary, OrangeSecondary)
                                                 )
-                                            ),
-                                        contentAlignment = Alignment.Center
+                                            ), contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = getTabIcon(tab.route),

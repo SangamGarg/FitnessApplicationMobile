@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -26,7 +27,7 @@ private val DarkBackground = Color(0xFF0F0F17)
 
 @Composable
 fun SettingsScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     var darkModeEnabled by remember { mutableStateOf(true) }
     var notificationsEnabled by remember { mutableStateOf(true) }
@@ -34,6 +35,7 @@ fun SettingsScreen(
     var reminderTime by remember { mutableStateOf("08:00 AM") }
     var selectedUnit by remember { mutableStateOf("Metric (kg/cm)") }
     var showUnitDialog by remember { mutableStateOf(false) }
+    var showDeleteAccountDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     Box(
@@ -46,10 +48,20 @@ fun SettingsScreen(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
-                    title = { Text("Settings & Preferences", fontWeight = FontWeight.Bold, color = Color.White) },
+                    title = {
+                        Text(
+                            "Settings & Preferences",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color.White
+                            )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -149,7 +161,37 @@ fun SettingsScreen(
                                 icon = Icons.Default.Timer,
                                 title = "Daily Workout Reminder",
                                 subtitle = reminderTime,
-                                onClick = { reminderTime = if (reminderTime == "08:00 AM") "06:30 PM" else "08:00 AM" }
+                                onClick = {
+                                    reminderTime =
+                                        if (reminderTime == "08:00 AM") "06:30 PM" else "08:00 AM"
+                                }
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Account Danger Zone",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF5252)
+                    )
+                }
+
+                item {
+                    GlassCardContainer {
+                        Column(
+                            modifier = Modifier.padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            SettingClickRow(
+                                icon = Icons.Default.DeleteForever,
+                                title = "Delete My Account",
+                                subtitle = "Permanently remove your account and all fitness data",
+                                tint = Color(0xFFFF5252),
+                                onClick = { showDeleteAccountDialog = true }
                             )
                         }
                     }
@@ -162,17 +204,114 @@ fun SettingsScreen(
                     title = { Text("Select Measurement Units") },
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(onClick = { selectedUnit = "Metric (kg/cm)"; showUnitDialog = false }) {
+                            TextButton(onClick = {
+                                selectedUnit = "Metric (kg/cm)"; showUnitDialog = false
+                            }) {
                                 Text("Metric (kg/cm)", color = OrangePrimary)
                             }
-                            TextButton(onClick = { selectedUnit = "Imperial (lbs/in)"; showUnitDialog = false }) {
+                            TextButton(onClick = {
+                                selectedUnit = "Imperial (lbs/in)"; showUnitDialog = false
+                            }) {
                                 Text("Imperial (lbs/in)", color = OrangePrimary)
                             }
                         }
                     },
                     confirmButton = {
-                        Button(onClick = { showUnitDialog = false }, colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)) {
+                        Button(
+                            onClick = { showUnitDialog = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                        ) {
                             Text("Close")
+                        }
+                    }
+                )
+            }
+
+            if (showDeleteAccountDialog) {
+                var deleteConfirmText by remember { mutableStateOf("") }
+                val isDeleteConfirmed = deleteConfirmText.trim().equals("delete", ignoreCase = true)
+
+                AlertDialog(
+                    onDismissRequest = { showDeleteAccountDialog = false },
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = Color(0xFF181824),
+                    icon = {
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFFF5252).copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteForever,
+                                contentDescription = "Delete Account",
+                                tint = Color(0xFFFF5252),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    },
+                    title = {
+                        Text(
+                            text = "Delete My Account ⚠️",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(
+                                text = "Are you sure you want to permanently delete your MusclePlay account? All your workout history, MP coins, and progress photos will be deleted forever.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.85f)
+                            )
+
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "Type \"delete\" below to confirm:",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFF5252)
+                                )
+
+                                OutlinedTextField(
+                                    value = deleteConfirmText,
+                                    onValueChange = { deleteConfirmText = it },
+                                    placeholder = { Text("delete", color = Color.White.copy(alpha = 0.4f)) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedBorderColor = Color(0xFFFF5252),
+                                        unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
+                                    )
+                                )
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                if (isDeleteConfirmed) {
+                                    showDeleteAccountDialog = false
+                                    onBack()
+                                }
+                            },
+                            enabled = isDeleteConfirmed,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFFF5252),
+                                disabledContainerColor = Color.White.copy(alpha = 0.12f)
+                            )
+                        ) {
+                            Text("Delete Account", fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteAccountDialog = false }) {
+                            Text("Cancel", color = Color.White.copy(alpha = 0.6f))
                         }
                     }
                 )
@@ -217,7 +356,7 @@ fun SettingSwitchRow(
     title: String,
     subtitle: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -226,8 +365,17 @@ fun SettingSwitchRow(
         Icon(imageVector = icon, contentDescription = null, tint = OrangePrimary)
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color.White)
-            Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.6f)
+            )
         }
         Switch(
             checked = checked,
@@ -247,7 +395,8 @@ fun SettingClickRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     subtitle: String,
-    onClick: () -> Unit
+    tint: Color = OrangePrimary,
+    onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -255,12 +404,27 @@ fun SettingClickRow(
             .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(imageVector = icon, contentDescription = null, tint = OrangePrimary)
+        Icon(imageVector = icon, contentDescription = null, tint = tint)
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color.White)
-            Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = OrangeSecondary)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            if (subtitle.isNotBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OrangeSecondary
+                )
+            }
         }
-        Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.5f))
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.5f)
+        )
     }
 }

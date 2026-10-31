@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -1583,13 +1584,21 @@ private fun GlassMuscleRecoveryCard(
                 Spacer(modifier = Modifier.width(6.dp))
             }
 
+            val recoveryItems = remember {
+                listOf(
+                    Triple("Chest", "High Strain", OrangePrimary),
+                    Triple("Triceps", "High Strain", OrangePrimary),
+                    Triple("Quads", "Fresh", Color(0xFF4CAF50))
+                )
+            }
+
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(horizontal = 2.dp)
             ) {
-                item { MuscleRecoveryPill("Chest", "High Strain", OrangePrimary) }
-                item { MuscleRecoveryPill("Triceps", "High Strain", OrangePrimary) }
-                item { MuscleRecoveryPill("Quads", "Fresh", Color(0xFF4CAF50)) }
+                items(recoveryItems, key = { it.first }) { item ->
+                    MuscleRecoveryPill(item.first, item.second, item.third)
+                }
             }
         }
     }
