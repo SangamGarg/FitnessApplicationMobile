@@ -29,7 +29,7 @@ class LivenessChallengeEvaluatorTest {
         )
 
     @Test
-    fun `counter remains blocked until two challenges pass`() {
+    fun counterRemainsBlockedUntilTwoChallengesPass() {
         val sequence = listOf(
             LivenessChallengeType.RAISE_LEFT_HAND,
             LivenessChallengeType.RAISE_RIGHT_HAND
@@ -56,7 +56,7 @@ class LivenessChallengeEvaluatorTest {
     }
 
     @Test
-    fun `pose loss revokes verified state`() {
+    fun poseLossRevokesVerifiedState() {
         val evaluator = LivenessChallengeEvaluator(
             config = LivenessConfig(requiredStableFrames = 1),
             chooseChallenge = { options -> options.first() }
@@ -84,7 +84,7 @@ class LivenessChallengeEvaluatorTest {
     }
 
     @Test
-    fun `rep gate blocks until verified`() {
+    fun repGateBlocksUntilVerified() {
         val gate = RepCountingGate()
         assertFalse(gate.mayProcessExercisePose())
         gate.update(LivenessState(status = LivenessStatus.VERIFIED, canCountRepetitions = true))

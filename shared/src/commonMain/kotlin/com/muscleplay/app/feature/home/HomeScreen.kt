@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +64,7 @@ data class DayStreakInfo(
 
 @Composable
 fun HomeScreen(
+    notificationRepository: com.muscleplay.app.core.network.notification.NotificationRepository? = null,
     onNavigateToDiet: () -> Unit = {},
     onNavigateToWorkouts: () -> Unit = {},
     onNavigateToGames: () -> Unit = {},
@@ -70,6 +72,7 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit = {},
     onNavigateToScanner: () -> Unit = {},
     onNavigateToCoinsHub: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
@@ -90,6 +93,16 @@ fun HomeScreen(
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulseAlpha"
+    )
+
+    val coroutineScope = rememberCoroutineScope()
+
+    com.muscleplay.app.core.network.notification.RequestNotificationPermissionEffect(
+        onRequestCompleted = {
+            coroutineScope.launch {
+                notificationRepository?.registerCurrentDevice()
+            }
+        }
     )
 
     var currentWaterMl by remember { mutableIntStateOf(1750) }
@@ -208,7 +221,9 @@ fun HomeScreen(
                             .padding(top = headerTopPadding)
                     ) {
                         GlassHeaderSection(
-                            onNavigateToProfile = onNavigateToProfile
+                            notificationRepository = notificationRepository,
+                            onNavigateToProfile = onNavigateToProfile,
+                            onNavigateToNotifications = onNavigateToNotifications
                         )
                     }
 
@@ -990,14 +1005,19 @@ private fun FabActionPill(
 
 @Composable
 private fun GlassHeaderSection(
+    notificationRepository: com.muscleplay.app.core.network.notification.NotificationRepository? = null,
     onNavigateToProfile: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
 ) {
+    val unreadCount by notificationRepository?.unreadCountFlow?.collectAsState()
+        ?: remember { mutableStateOf(0) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
             Surface(
                 color = OrangePrimary.copy(alpha = 0.2f),
                 shape = RoundedCornerShape(20.dp),
@@ -1032,7 +1052,7 @@ private fun GlassHeaderSection(
             Text(
                 text = "Let's crush it! 🔥",
                 style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.Medium,
                 color = Color.White
             )
 
@@ -1043,22 +1063,62 @@ private fun GlassHeaderSection(
             )
         }
 
-        GlassContainer(
-            modifier = Modifier
-                .size(60.dp)
-                .clip(CircleShape)
-                .clickable(onClick = onNavigateToProfile)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.08f))
+                    .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
+                    .clickable(onClick = onNavigateToNotifications),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Profile",
-                    tint = OrangePrimary,
-                    modifier = Modifier.size(32.dp)
+                    imageVector = Icons.Default.Notifications,
+                    contentDescription = "Notifications",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
                 )
+                if (unreadCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(2.dp)
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(OrangePrimary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (unreadCount > 9) "9+" else "$unreadCount",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+
+            GlassContainer(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onNavigateToProfile)
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "Profile",
+                        tint = OrangePrimary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
         }
     }

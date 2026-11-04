@@ -1,12 +1,26 @@
 package com.muscleplay.app.feature.onboarding
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -16,9 +30,35 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,12 +70,19 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.muscleplay.app.core.network.NetworkResult
 import com.muscleplay.app.feature.auth.AuthRepository
 import com.muscleplay.app.feature.auth.AuthValidator
-import com.muscleplay.app.feature.onboarding.model.*
+import com.muscleplay.app.feature.onboarding.model.ActivityLevel
+import com.muscleplay.app.feature.onboarding.model.FitnessGoal
+import com.muscleplay.app.feature.onboarding.model.Gender
+import com.muscleplay.app.feature.onboarding.model.UserActivityLevel
+import com.muscleplay.app.feature.onboarding.model.UserExperienceLevel
+import com.muscleplay.app.feature.onboarding.model.UserFitnessGoal
+import com.muscleplay.app.feature.onboarding.model.UserGender
+import com.muscleplay.app.feature.onboarding.model.UserOnboardingProfile
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 
 private val OrangePrimary = Color(0xFFFF5722)
@@ -59,25 +106,26 @@ fun UserProfileSetupScreen(
     authRepository: AuthRepository? = null,
     onSetupComplete: (UserOnboardingProfile) -> Unit
 ) {
-    val pagerState = rememberPagerState(pageCount = { 5 })
+    val pagerState = rememberPagerState(pageCount = { 4 })
     val coroutineScope = rememberCoroutineScope()
 
     // User Profile State
     var fullNameText by remember { mutableStateOf("") }
-    var gender by remember { mutableStateOf(UserGender.MALE) }
-    var fitnessGoal by remember { mutableStateOf(UserFitnessGoal.FAT_LOSS) }
+    var gender by remember { mutableStateOf(Gender.MALE) }
+    var fitnessGoal by remember { mutableStateOf(FitnessGoal.WEIGHT_LOSS) }
     var isImperial by remember { mutableStateOf(false) }
 
     var heightText by remember { mutableStateOf("175") }
     var weightText by remember { mutableStateOf("70") }
-    var targetWeightText by remember { mutableStateOf("65") }
     var ageText by remember { mutableStateOf("25") }
 
-    var activityLevel by remember { mutableStateOf(UserActivityLevel.MODERATELY_ACTIVE) }
+    var activityLevel by remember { mutableStateOf(ActivityLevel.LEVEL_3) }
     var experienceLevel by remember { mutableStateOf(UserExperienceLevel.INTERMEDIATE) }
 
     var profileImageName by remember { mutableStateOf<String?>(null) }
     var showNameError by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
+    var submitErrorMsg by remember { mutableStateOf<String?>(null) }
     var isConfettiActive by remember { mutableStateOf(false) }
 
     // Step Validations
@@ -86,56 +134,41 @@ fun UserProfileSetupScreen(
 
     val rawHeight = heightText.toDoubleOrNull() ?: 0.0
     val rawWeight = weightText.toDoubleOrNull() ?: 0.0
-    val rawTargetWeight = targetWeightText.toDoubleOrNull() ?: 0.0
     val age = ageText.toIntOrNull() ?: 0
 
-    val minH = if (isImperial) 20.0 else 50.0
-    val maxH = if (isImperial) 120.0 else 300.0
-    val minW = if (isImperial) 44.0 else 20.0
-    val maxW = if (isImperial) 660.0 else 300.0
+    val heightCm = if (isImperial) rawHeight * 2.54 else rawHeight
+    val weightKg = if (isImperial) rawWeight / 2.20462 else rawWeight
 
     val heightError = when {
         heightText.isBlank() -> "Height is required"
         rawHeight <= 0 -> "Height cannot be 0"
-        rawHeight !in minH..maxH -> "Enter valid height (${minH.toInt()} - ${maxH.toInt()})"
+        heightCm !in 50.0..250.0 -> if (isImperial) "Enter valid height (20 - 98 in)" else "Enter valid height (50.0 - 250.0 cm)"
         else -> null
     }
 
     val weightError = when {
         weightText.isBlank() -> "Weight is required"
         rawWeight <= 0 -> "Weight cannot be 0"
-        rawWeight !in minW..maxW -> "Enter valid weight (${minW.toInt()} - ${maxW.toInt()})"
-        else -> null
-    }
-
-    val targetWeightError = when {
-        targetWeightText.isBlank() -> "Target weight is required"
-        rawTargetWeight <= 0 -> "Target weight cannot be 0"
-        rawTargetWeight !in minW..maxW -> "Enter valid target weight (${minW.toInt()} - ${maxW.toInt()})"
+        weightKg !in 10.0..500.0 -> if (isImperial) "Enter valid weight (22 - 1102 lbs)" else "Enter valid weight (10.0 - 500.0 kg)"
         else -> null
     }
 
     val ageError = when {
         ageText.isBlank() -> "Age is required"
-        age <= 0 -> "Age cannot be 0"
-        age !in 10..120 -> "Age must be between 10 and 120"
+        age < 13 || age > 120 -> "Age must be between 13 and 120"
         else -> null
     }
 
-    val isStep2Valid = heightError == null && weightError == null && targetWeightError == null && ageError == null
+    val isStep2Valid = heightError == null && weightError == null && ageError == null
 
-    val heightCm = if (isImperial) rawHeight * 2.54 else rawHeight
-    val weightKg = if (isImperial) rawWeight / 2.20462 else rawWeight
-    val targetWeightKg = if (isImperial) rawTargetWeight / 2.20462 else rawTargetWeight
-
-    val currentProfile = remember(fullNameText, gender, fitnessGoal, heightCm, weightKg, targetWeightKg, age, activityLevel, experienceLevel, profileImageName, isImperial) {
+    val currentProfile = remember(fullNameText, gender, fitnessGoal, heightCm, weightKg, age, activityLevel, experienceLevel, profileImageName, isImperial) {
         UserOnboardingProfile(
             fullName = fullNameText.trim(),
             gender = gender,
             fitnessGoal = fitnessGoal,
             heightCm = heightCm,
             weightKg = weightKg,
-            targetWeightKg = targetWeightKg,
+            targetWeightKg = weightKg,
             age = age,
             activityLevel = activityLevel,
             experienceLevel = experienceLevel,
@@ -162,11 +195,14 @@ fun UserProfileSetupScreen(
                     title = { Text("Profile & Goal Setup", fontWeight = FontWeight.ExtraBold, color = Color.White) },
                     navigationIcon = {
                         if (pagerState.currentPage > 0) {
-                            IconButton(onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(pagerState.currentPage - 1)
-                                }
-                            }) {
+                            IconButton(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                                    }
+                                },
+                                enabled = !isSubmitting
+                            ) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous Step", tint = Color.White)
                             }
                         }
@@ -181,7 +217,7 @@ fun UserProfileSetupScreen(
                     .padding(innerPadding)
                     .imePadding()
             ) {
-                // Step Progress Indicator Bar
+                // Step Progress Indicator Bar (Updated to 4 steps)
                 Column(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -191,7 +227,7 @@ fun UserProfileSetupScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "STEP ${pagerState.currentPage + 1} OF 5",
+                            text = "STEP ${pagerState.currentPage + 1} OF 4",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = OrangePrimary,
@@ -202,8 +238,7 @@ fun UserProfileSetupScreen(
                                 0 -> "Name, Gender & Goal"
                                 1 -> "Body Measurements"
                                 2 -> "Activity & Experience"
-                                3 -> "Profile Picture (Optional)"
-                                else -> "AI Plan Computation"
+                                else -> "Profile Picture & Avatars"
                             },
                             style = MaterialTheme.typography.labelSmall,
                             color = OrangeSecondary,
@@ -212,7 +247,7 @@ fun UserProfileSetupScreen(
                     }
 
                     LinearProgressIndicator(
-                        progress = { (pagerState.currentPage + 1) / 5f },
+                        progress = { (pagerState.currentPage + 1) / 4f },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(8.dp)
@@ -222,10 +257,10 @@ fun UserProfileSetupScreen(
                     )
                 }
 
-                // Horizontal Pager for Smooth Swiping between 5 Steps
+                // Horizontal Pager for Smooth Swiping between 4 Steps
                 HorizontalPager(
                     state = pagerState,
-                    userScrollEnabled = isCurrentStepValid,
+                    userScrollEnabled = isCurrentStepValid && !isSubmitting,
                     modifier = Modifier.weight(1f)
                 ) { page ->
                     LazyColumn(
@@ -346,7 +381,7 @@ fun UserProfileSetupScreen(
                             }
 
                             1 -> {
-                                // STEP 2: MEASUREMENTS
+                                // STEP 2: MEASUREMENTS (Height, Weight, Age)
                                 item {
                                     GlassCardContainer {
                                         Column(
@@ -412,26 +447,6 @@ fun UserProfileSetupScreen(
                                                     colors = inputColors()
                                                 )
                                                 weightError?.let {
-                                                    Text(it, style = MaterialTheme.typography.labelSmall, color = Color(0xFFFF5252))
-                                                }
-                                            }
-
-                                            // Target Weight Input
-                                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                                OutlinedTextField(
-                                                    value = targetWeightText,
-                                                    onValueChange = { input ->
-                                                        targetWeightText = input.filter { it.isDigit() || it == '.' }
-                                                    },
-                                                    label = { Text(if (isImperial) "Target Goal Weight (lbs)" else "Target Goal Weight (kg)", color = OrangePrimary) },
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    shape = RoundedCornerShape(14.dp),
-                                                    singleLine = true,
-                                                    isError = targetWeightError != null,
-                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                    colors = inputColors()
-                                                )
-                                                targetWeightError?.let {
                                                     Text(it, style = MaterialTheme.typography.labelSmall, color = Color(0xFFFF5252))
                                                 }
                                             }
@@ -561,8 +576,8 @@ fun UserProfileSetupScreen(
                                 }
                             }
 
-                            3 -> {
-                                // STEP 4: SKIPPABLE PROFILE PICTURE & 6 NEON GLASS ATHLETIC AVATARS
+                            else -> {
+                                // STEP 4: PROFILE PICTURE & 6 NEON GLASS ATHLETIC AVATARS (FINAL STEP)
                                 item {
                                     GlassCardContainer {
                                         Column(
@@ -572,7 +587,7 @@ fun UserProfileSetupScreen(
                                         ) {
                                             Text("Profile Picture & Neon Avatars", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
                                             Text(
-                                                text = "Upload a photo, capture a selfie, or pick one of 6 Neon Athletic Avatars below!",
+                                                text = "Pick one of 6 Neon Athletic Avatars below to personalize your profile!",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = Color.White.copy(alpha = 0.7f)
                                             )
@@ -589,7 +604,7 @@ fun UserProfileSetupScreen(
                                                 if (profileImageName != null) {
                                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                         Text(
-                                                            text = neonAvatarsList.firstOrNull { it.name == profileImageName }?.emoji ?: "📸",
+                                                            text = neonAvatarsList.firstOrNull { it.name == profileImageName }?.emoji ?: "👤",
                                                             fontSize = 36.sp
                                                         )
                                                     }
@@ -617,7 +632,7 @@ fun UserProfileSetupScreen(
                                             }
 
                                             // 6 Neon Glass Athletic Avatars Selection Grid
-                                            Text("Or Pick a Neon Athlete Avatar ⚡", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = OrangeSecondary)
+                                            Text("Pick a Neon Athlete Avatar ⚡", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = OrangeSecondary)
 
                                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                                 val chunkedAvatars = neonAvatarsList.chunked(2)
@@ -652,90 +667,19 @@ fun UserProfileSetupScreen(
                                                 }
                                             }
 
-                                            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-
-                                            // Camera & Gallery Upload Buttons
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                Button(
-                                                    onClick = {
-                                                        profileImageName = "Selfie Camera ${Random.nextInt(100, 999)}"
-                                                    },
-                                                    modifier = Modifier.weight(1f).height(44.dp),
-                                                    shape = RoundedCornerShape(14.dp),
-                                                    colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                                            if (submitErrorMsg != null) {
+                                                Surface(
+                                                    color = Color(0x33FF5252),
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF5252))
                                                 ) {
-                                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                        Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                        Text("Camera 📸", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                                    }
+                                                    Text(
+                                                        text = submitErrorMsg ?: "",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = Color(0xFFFF5252),
+                                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                                    )
                                                 }
-
-                                                OutlinedButton(
-                                                    onClick = {
-                                                        profileImageName = "Gallery Photo ${Random.nextInt(100, 999)}"
-                                                    },
-                                                    modifier = Modifier.weight(1f).height(44.dp),
-                                                    shape = RoundedCornerShape(14.dp),
-                                                    border = androidx.compose.foundation.BorderStroke(1.dp, OrangeSecondary),
-                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeSecondary)
-                                                ) {
-                                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                        Icon(Icons.Default.Collections, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                        Text("Gallery 🖼️", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            else -> {
-                                // STEP 5: AI COMPUTATION, PLAN SUMMARY & CELEBRATION
-                                item {
-                                    GlassCardContainer {
-                                        Column(
-                                            modifier = Modifier.padding(22.dp),
-                                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(42.dp)
-                                                        .clip(CircleShape)
-                                                        .background(OrangePrimary.copy(alpha = 0.2f)),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = OrangeSecondary)
-                                                }
-                                                Column {
-                                                    Text("Your AI Plan is Ready, ${currentProfile.fullName.ifBlank { "Athlete" }}! 🎯", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Color.White)
-                                                    Text("Computed based on your profile & goal", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
-                                                }
-                                            }
-
-                                            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                            ) {
-                                                StatSummaryBox("Daily Target", "${currentProfile.targetDailyCalories} kcal", OrangePrimary, Modifier.weight(1f))
-                                                StatSummaryBox("BMR Base", "${currentProfile.bmrCalories} kcal", OrangeSecondary, Modifier.weight(1f))
-                                            }
-
-                                            Text("Daily Target Macro Ratios", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White)
-
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                MacroBox("Protein", "${currentProfile.targetProteinGrams}g", OrangePrimary, Modifier.weight(1f))
-                                                MacroBox("Carbs", "${currentProfile.targetCarbsGrams}g", OrangeSecondary, Modifier.weight(1f))
-                                                MacroBox("Fats", "${currentProfile.targetFatGrams}g", Color(0xFF2196F3), Modifier.weight(1f))
                                             }
                                         }
                                     }
@@ -760,6 +704,7 @@ fun UserProfileSetupScreen(
                                     pagerState.animateScrollToPage(pagerState.currentPage - 1)
                                 }
                             },
+                            enabled = !isSubmitting,
                             modifier = Modifier
                                 .weight(1f)
                                 .height(52.dp),
@@ -774,7 +719,6 @@ fun UserProfileSetupScreen(
                         }
                     }
 
-
                     Button(
                         onClick = {
                             if (pagerState.currentPage == 0 && !isStep1Valid) {
@@ -782,21 +726,30 @@ fun UserProfileSetupScreen(
                                 return@Button
                             }
 
-                            if (pagerState.currentPage < 4) {
+                            if (pagerState.currentPage < 3) {
                                 coroutineScope.launch {
                                     pagerState.animateScrollToPage(pagerState.currentPage + 1)
                                 }
                             } else {
-                                // Step 5: Celebration Confetti Burst & Submit Profile to Backend
-                                isConfettiActive = true
+                                // Step 4 (Final Step): Submit Profile Completion API to Backend
                                 coroutineScope.launch {
-                                    authRepository?.submitProfileCompletion(currentProfile)
-                                    delay(1400L.milliseconds)
-                                    onSetupComplete(currentProfile)
+                                    isSubmitting = true
+                                    submitErrorMsg = null
+                                    val result = authRepository?.submitProfileCompletion(currentProfile)
+                                    if (result == null || result is NetworkResult.Success) {
+                                        isConfettiActive = true
+                                        delay(1200L.milliseconds)
+                                        onSetupComplete(currentProfile)
+                                    } else if (result is NetworkResult.Error) {
+                                        submitErrorMsg = result.message
+                                    } else if (result is NetworkResult.Exception) {
+                                        submitErrorMsg = result.throwable.message ?: "An error occurred during profile setup"
+                                    }
+                                    isSubmitting = false
                                 }
                             }
                         },
-                        enabled = isCurrentStepValid,
+                        enabled = isCurrentStepValid && !isSubmitting,
                         modifier = Modifier
                             .weight(if (pagerState.currentPage > 0) 1.2f else 1f)
                             .height(52.dp),
@@ -806,15 +759,23 @@ fun UserProfileSetupScreen(
                             disabledContainerColor = Color.White.copy(alpha = 0.12f)
                         )
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = if (pagerState.currentPage < 4) "Next Step" else "Complete Setup 🚀",
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 15.sp,
-                                color = Color.White
+                        if (isSubmitting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                color = Color.White,
+                                strokeWidth = 2.5.dp
                             )
-                            if (pagerState.currentPage < 4) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = if (pagerState.currentPage < 3) "Next Step" else "Complete Setup 🚀",
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 15.sp,
+                                    color = Color.White
+                                )
+                                if (pagerState.currentPage < 3) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                }
                             }
                         }
                     }
@@ -870,46 +831,11 @@ private fun ConfettiBurstOverlay() {
 }
 
 @Composable
-private fun StatSummaryBox(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
-    Surface(
-        color = color.copy(alpha = 0.2f),
-        shape = RoundedCornerShape(14.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.4f)),
-        modifier = modifier
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.Bold)
-            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Color.White)
-        }
-    }
-}
-
-@Composable
-private fun MacroBox(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
-    Surface(
-        color = color.copy(alpha = 0.2f),
-        shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.4f)),
-        modifier = modifier
-    ) {
-        Column(
-            modifier = Modifier.padding(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.Bold)
-            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, color = Color.White)
-        }
-    }
-}
-
-@Composable
 private fun inputColors() = OutlinedTextFieldDefaults.colors(
     focusedTextColor = Color.White,
     unfocusedTextColor = Color.White,
     focusedBorderColor = OrangePrimary,
+    errorTextColor = Color.White,
     unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
     errorBorderColor = Color(0xFFFF5252),
     errorLabelColor = Color(0xFFFF5252)

@@ -1,6 +1,8 @@
 package com.muscleplay.app.core.di
 
 import com.muscleplay.app.core.network.ApiClient
+import com.muscleplay.app.core.network.auth.TokenStorageManager
+import com.muscleplay.app.core.network.notification.NotificationRepository
 import com.muscleplay.app.feature.auth.AuthRepository
 import com.muscleplay.app.feature.diet.data.InMemoryMealDao
 import com.muscleplay.app.feature.diet.data.MealDao
@@ -12,9 +14,19 @@ class AppContainer {
     val workoutRepository: WorkoutRepository =
         InMemoryWorkoutRepository()
 
-    val apiClient: ApiClient = ApiClient()
+    val tokenStorageManager: TokenStorageManager = TokenStorageManager()
 
-    val authRepository: AuthRepository = AuthRepository(apiClient = apiClient)
+    val apiClient: ApiClient = ApiClient(tokenStorageManager = tokenStorageManager)
+
+    val authRepository: AuthRepository = AuthRepository(
+        apiClient = apiClient,
+        tokenStorageManager = tokenStorageManager
+    )
+
+    val notificationRepository: NotificationRepository = NotificationRepository(
+        apiClient = apiClient,
+        tokenStorageManager = tokenStorageManager
+    )
 
     val mealDao: MealDao = InMemoryMealDao()
 }

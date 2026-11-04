@@ -27,6 +27,10 @@ class AuthRepository(
     private val firebaseAuthRepository: FirebaseAuthRepository = createFirebaseAuthRepository(),
     val tokenStorageManager: TokenStorageManager = TokenStorageManager(),
 ) {
+    init {
+        apiClient.tokenStorageManager = tokenStorageManager
+    }
+
     private val _sessionState = MutableStateFlow<SessionState>(
         if (!tokenStorageManager.accessToken.isNullOrBlank()) {
             if (tokenStorageManager.isProfileComplete) SessionState.Authenticated else SessionState.ProfileIncomplete
@@ -160,12 +164,12 @@ class AuthRepository(
         val accessToken = tokenStorageManager.accessToken ?: "mock_access_token_123"
         val dto = UserDetailsDto(
             name = profile.fullName,
-            gender = profile.gender.label,
+            gender = profile.gender.name,
             age = profile.age,
             heightCm = profile.heightCm.toFloat(),
             weightKg = profile.weightKg.toFloat(),
-            activityLevel = profile.activityLevel.title,
-            goal = profile.fitnessGoal.title,
+            activityLevel = profile.activityLevel.name,
+            goal = profile.fitnessGoal.name,
             bmi = (profile.weightKg / ((profile.heightCm / 100) * (profile.heightCm / 100))).toFloat(),
             dailyCalories = profile.targetDailyCalories.toFloat()
         )
@@ -183,9 +187,10 @@ class AuthRepository(
     }
 
     suspend fun logout(logoutEverywhere: Boolean = false): Boolean {
+        val accessToken = tokenStorageManager.accessToken ?: "mock_access_token_123"
         val refreshToken = tokenStorageManager.refreshToken ?: ""
         if (refreshToken.isNotBlank()) {
-            apiClient.logout(refreshToken, logoutEverywhere)
+            apiClient.logout(refreshToken, logoutEverywhere, accessToken)
         }
         firebaseAuthRepository.signOut()
         tokenStorageManager.clearSession()

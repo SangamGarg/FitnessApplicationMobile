@@ -11,7 +11,7 @@ interface AuthApiService {
     suspend fun resetPasswordWithOtp(request: ResetPasswordWithOtpRequestDto): NetworkResult<OtpActionResponseDto>
     suspend fun loginRegister(firebaseIdToken: String): NetworkResult<UserRegisterResponseDto>
     suspend fun refreshToken(refreshToken: String): NetworkResult<RefreshTokenResponseDto>
-    suspend fun logout(refreshToken: String, logoutEverywhere: Boolean = false): NetworkResult<Boolean>
+    suspend fun logout(refreshToken: String, logoutEverywhere: Boolean = false, accessToken: String = ""): NetworkResult<Boolean>
     suspend fun addUserDetails(accessToken: String, details: UserDetailsDto): NetworkResult<UserDetailsResponseDto>
     suspend fun patchUserDetails(accessToken: String, patch: UserPatchRequestDto): NetworkResult<UserDetailsResponseDto>
     suspend fun getUserDetails(accessToken: String): NetworkResult<UserDetailsResponseDto>

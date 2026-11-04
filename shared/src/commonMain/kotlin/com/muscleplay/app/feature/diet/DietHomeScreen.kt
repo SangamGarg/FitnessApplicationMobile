@@ -26,8 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.muscleplay.app.feature.diet.data.InMemoryMealDao
-import com.muscleplay.app.feature.diet.data.MealDao
 import com.muscleplay.app.feature.diet.data.LoggedMealTotals
+import com.muscleplay.app.feature.diet.data.MealDao
 import com.muscleplay.app.feature.diet.model.*
 
 private val OrangePrimary = Color(0xFFFF5722)

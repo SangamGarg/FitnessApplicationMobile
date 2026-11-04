@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 private val OrangePrimary = Color(0xFFFF5722)
 private val OrangeSecondary = Color(0xFFFF9800)
@@ -27,6 +28,7 @@ private val DarkBackground = Color(0xFF0F0F17)
 
 @Composable
 fun SettingsScreen(
+    notificationRepository: com.muscleplay.app.core.network.notification.NotificationRepository? = null,
     onBack: () -> Unit,
 ) {
     var darkModeEnabled by remember { mutableStateOf(true) }
@@ -37,6 +39,7 @@ fun SettingsScreen(
     var showUnitDialog by remember { mutableStateOf(false) }
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     Box(
         modifier = Modifier
@@ -106,7 +109,12 @@ fun SettingsScreen(
                                 title = "Push Notifications",
                                 subtitle = "Workout reminders and challenge alerts",
                                 checked = notificationsEnabled,
-                                onCheckedChange = { notificationsEnabled = it }
+                                onCheckedChange = { enabled ->
+                                    notificationsEnabled = enabled
+                                    coroutineScope.launch {
+                                        notificationRepository?.updateNotificationPreference(enabled)
+                                    }
+                                }
                             )
                             HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                             SettingSwitchRow(

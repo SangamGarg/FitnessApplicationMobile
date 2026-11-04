@@ -179,7 +179,7 @@ fun SignUpScreen(
                         Spacer(modifier = Modifier.height(6.dp))
 
                         Text(
-                            text = "Create your account for AI pose tracking",
+                            text = "Sign up to start your fitness journey",
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.White.copy(alpha = 0.7f)
                         )

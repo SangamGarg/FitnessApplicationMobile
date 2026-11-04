@@ -47,6 +47,7 @@ import com.muscleplay.app.feature.games.RepChallengeScreen
 import com.muscleplay.app.feature.games.pushup.PushUpCameraScreen
 import com.muscleplay.app.feature.games.squat.SquatCameraScreen
 import com.muscleplay.app.feature.home.HomeScreen
+import com.muscleplay.app.feature.notification.NotificationCenterScreen
 import com.muscleplay.app.feature.onboarding.OnboardingScreen
 import com.muscleplay.app.feature.onboarding.UserProfileSetupScreen
 import com.muscleplay.app.feature.onboarding.rememberOnboardingPreferences
@@ -91,6 +92,7 @@ private object Routes {
     const val PROFILE_COIN_REDEMPTION = "profile_coin_redemption"
     const val PROFILE_EMAIL_SUPPORT = "profile_email_support"
     const val PROFILE_AI_BOT = "profile_ai_bot"
+    const val NOTIFICATIONS = "notifications"
 
     const val HOME = "home"
     const val WORKOUTS = "workouts"
@@ -152,7 +154,8 @@ fun MusclePlayNavigation(
         Routes.PROFILE_MY_TICKETS,
         Routes.PROFILE_COIN_REDEMPTION,
         Routes.PROFILE_EMAIL_SUPPORT,
-        Routes.PROFILE_AI_BOT
+        Routes.PROFILE_AI_BOT,
+        Routes.NOTIFICATIONS
     )
     var isWorkoutSessionActive by remember { mutableStateOf(false) }
 
@@ -323,13 +326,16 @@ fun MusclePlayNavigation(
             }
             composable(Routes.HOME) {
                 HomeScreen(
+                    notificationRepository = appContainer.notificationRepository,
                     onNavigateToDiet = { navController.navigate(Routes.DIET_HOME) },
                     onNavigateToWorkouts = { navController.navigate(Routes.WORKOUTS) },
                     onNavigateToGames = { navController.navigate(Routes.GAMES) },
                     onNavigateToCalculators = { navController.navigate(Routes.CALCULATORS) },
                     onNavigateToProfile = { navController.navigate(Routes.PROFILE) },
                     onNavigateToScanner = { navController.navigate(Routes.INGREDIENT_SCANNER) },
-                    onNavigateToCoinsHub = { navController.navigate(Routes.PROFILE_COIN_REDEMPTION) })
+                    onNavigateToCoinsHub = { navController.navigate(Routes.PROFILE_COIN_REDEMPTION) },
+                    onNavigateToNotifications = { navController.navigate(Routes.NOTIFICATIONS) }
+                )
             }
             composable(Routes.DIET_HOME) {
                 DietHomeScreen(
@@ -436,9 +442,21 @@ fun MusclePlayNavigation(
             }
             composable(Routes.PROFILE_SETTINGS) {
                 SettingsScreen(
+                    notificationRepository = appContainer.notificationRepository,
                     onBack = {
                         navController.popBackStack()
                     })
+            }
+            composable(Routes.NOTIFICATIONS) {
+                NotificationCenterScreen(
+                    notificationRepository = appContainer.notificationRepository,
+                    onNavigateToRoute = { route ->
+                        if (route.isNotBlank()) navController.navigate(route)
+                    },
+                    onBack = {
+                        navController.popBackStack()
+                    }
+                )
             }
             composable(Routes.PROFILE_RAISE_TICKET) {
                 RaiseTicketScreen(onBack = {
