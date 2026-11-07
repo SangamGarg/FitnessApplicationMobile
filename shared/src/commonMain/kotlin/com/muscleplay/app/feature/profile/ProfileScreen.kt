@@ -226,8 +226,8 @@ fun ProfileScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
-    val expandedHeaderHeight = 340.dp
-    val collapsedHeaderHeight = 76.dp
+    val expandedHeaderHeight = 250.dp
+    val collapsedHeaderHeight = 64.dp
     val density = LocalDensity.current
     val collapseRangePx = with(density) {
         (expandedHeaderHeight - collapsedHeaderHeight).toPx()
@@ -340,7 +340,7 @@ fun ProfileScreen(
                     .nestedScroll(nestedScrollConnection)
             ) {
                 // Pinned Header with Level & XP Bar
-                Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
+                Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp)) {
                     GlassCollapsibleProfileCard(
                         userName = "Alex Fitness",
                         userEmail = "alex.fitness@muscleplay.com",
@@ -1137,7 +1137,7 @@ fun ProfileStatBadge(label: String, value: String) {
         border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -1373,10 +1373,11 @@ fun GlassCollapsibleProfileCard(
     onSettingsClick: () -> Unit,
 ) {
     val cardHeight = lerp(expandedHeight, collapsedHeight, collapseProgress)
-    val avatarSize = (84.dp - (42.dp * collapseProgress))
-    val avatarIconSize = (50.dp - (24.dp * collapseProgress))
-    val cardPadding = (22.dp - (10.dp * collapseProgress))
-    val cornerRadius = (28.dp - (8.dp * collapseProgress))
+    val avatarSize = (64.dp - (26.dp * collapseProgress))
+    val avatarIconSize = (36.dp - (16.dp * collapseProgress))
+    val cardPaddingHorizontal = (14.dp - (4.dp * collapseProgress))
+    val cardPaddingVertical = (8.dp - (2.dp * collapseProgress))
+    val cornerRadius = (22.dp - (6.dp * collapseProgress))
 
     GlassContainer(
         modifier = Modifier
@@ -1387,7 +1388,7 @@ fun GlassCollapsibleProfileCard(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(cardPadding),
+                .padding(horizontal = cardPaddingHorizontal, vertical = cardPaddingVertical),
             contentAlignment = Alignment.Center
         ) {
             if (collapseProgress < 0.5f) {
@@ -1420,22 +1421,22 @@ fun GlassCollapsibleProfileCard(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
                         text = userName,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color.White
                     )
 
                     Text(
                         text = userEmail,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = Color.White.copy(alpha = 0.7f)
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     // Task 1: Level 14 & XP Progress Bar
                     val currentXp = 3450
@@ -1474,14 +1475,14 @@ fun GlassCollapsibleProfileCard(
                             progress = { currentXp.toFloat() / targetXp },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp)),
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
                             color = OrangePrimary,
                             trackColor = Color.White.copy(alpha = 0.1f)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Column(
                         modifier = Modifier.fillMaxWidth(),
@@ -1514,7 +1515,7 @@ fun GlassCollapsibleProfileCard(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(
                                     Brush.linearGradient(
@@ -1530,7 +1531,7 @@ fun GlassCollapsibleProfileCard(
                                 imageVector = Icons.Default.Person,
                                 contentDescription = "Profile Picture",
                                 tint = Color.White,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
