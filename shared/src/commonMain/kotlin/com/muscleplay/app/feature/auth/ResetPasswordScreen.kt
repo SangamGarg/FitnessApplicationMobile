@@ -50,6 +50,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -80,12 +81,15 @@ private val DarkBackground = Color(0xFF0F0F17)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResetPasswordScreen(
-    userEmail: String,
-    verificationToken: String,
+    userEmail: String = "",
+    verificationToken: String = "",
     authRepository: AuthRepository? = null,
-    onResetSuccess: (newPassword: String) -> Unit,
-    onBack: () -> Unit
+    onResetSuccess: (newPassword: String) -> Unit = {},
+    onBack: () -> Unit = {}
 ) {
+    val authFlowData by (authRepository?.authFlowData?.collectAsState() ?: remember { mutableStateOf(AuthFlowData()) })
+    val targetEmail = userEmail.ifBlank { authFlowData.pendingEmail }
+    val targetToken = verificationToken.ifBlank { authFlowData.pendingVerificationToken }
     var newPasswordText by remember { mutableStateOf("") }
     var confirmPasswordText by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
@@ -109,8 +113,8 @@ fun ResetPasswordScreen(
         isSubmitting = true
         coroutineScope.launch {
             val result = authRepository?.resetPasswordWithOtp(
-                email = userEmail,
-                verificationToken = verificationToken,
+                email = targetEmail,
+                verificationToken = targetToken,
                 newPass = newPasswordText
             )
             isSubmitting = false

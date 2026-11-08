@@ -145,28 +145,6 @@ fun CalculatorsScreen() {
                             color = Color.White
                         )
                     }
-
-                    // Metric vs Imperial Units Switcher
-                    Surface(
-                        onClick = { isImperialUnits = !isImperialUnits },
-                        color = Color.White.copy(alpha = 0.08f),
-                        shape = RoundedCornerShape(14.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.4f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(Icons.Default.Straighten, contentDescription = "Units", tint = OrangeSecondary, modifier = Modifier.size(16.dp))
-                            Text(
-                                text = if (isImperialUnits) "Imperial (lbs/in)" else "Metric (kg/cm)",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
                 }
             }
 

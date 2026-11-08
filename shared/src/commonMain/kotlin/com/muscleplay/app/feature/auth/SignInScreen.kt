@@ -99,7 +99,7 @@ fun SignInScreen(
     authRepository: AuthRepository? = null,
     onSignInSuccess: (isProfileComplete: Boolean) -> Unit,
     onNavigateToSignUp: () -> Unit,
-    onNavigateToResetPassword: (email: String, verificationToken: String) -> Unit = { _, _ -> },
+    onNavigateToResetPassword: () -> Unit = {},
 ) {
     val email = remember { FieldState() }
     var passwordText by remember { mutableStateOf("") }
@@ -650,8 +650,9 @@ fun SignInScreen(
                                                 isDialogLoading = false
                                                 if (res is NetworkResult.Success) {
                                                     val token = res.data
+                                                    authRepository?.setPendingResetPasswordData(resetEmailText, token)
                                                     showForgotPasswordDialog = false
-                                                    onNavigateToResetPassword(resetEmailText, token)
+                                                    onNavigateToResetPassword()
                                                 } else if (res is NetworkResult.Error) {
                                                     dialogErrorMsg = res.message
                                                 }

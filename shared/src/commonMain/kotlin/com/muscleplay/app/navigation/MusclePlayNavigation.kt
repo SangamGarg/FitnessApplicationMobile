@@ -67,7 +67,7 @@ private val OrangePrimary = Color(0xFFFF5722)
 private val OrangeSecondary = Color(0xFFFF9800)
 private val DarkBackground = Color(0xFF0F0F17)
 
-private object Routes {
+object Routes {
     const val SPLASH = "splash"
     const val ONBOARDING = "onboarding"
     const val SIGN_IN = "sign_in"
@@ -159,6 +159,14 @@ fun MusclePlayNavigation(
     )
     var isWorkoutSessionActive by remember { mutableStateOf(false) }
 
+    val pendingNotificationRoute by NotificationIntentHandler.pendingRouteFlow.collectAsState()
+    LaunchedEffect(pendingNotificationRoute) {
+        pendingNotificationRoute?.let { route ->
+            navController.navigate(route)
+            NotificationIntentHandler.clearPendingRoute()
+        }
+    }
+
     LaunchedEffect(currentRoute) {
         if (currentRoute != Routes.WORKOUTS) {
             isWorkoutSessionActive = false
@@ -166,9 +174,7 @@ fun MusclePlayNavigation(
     }
 
     val shouldHideBottomBar =
-        isWorkoutSessionActive || currentRoute in bottomBarHiddenRoutes || currentRoute?.startsWith(
-            Routes.OTP_VERIFICATION
-        ) == true || currentRoute?.startsWith(Routes.RESET_PASSWORD) == true
+        isWorkoutSessionActive || currentRoute in bottomBarHiddenRoutes
 
     val selectedIndex = remember(currentDestination) {
         val activeRoute = tabs.firstOrNull { tab ->
@@ -261,17 +267,13 @@ fun MusclePlayNavigation(
                     onNavigateToSignUp = {
                         navController.navigate(Routes.SIGN_UP)
                     },
-                    onNavigateToResetPassword = { email, token ->
-                        navController.navigate("${Routes.RESET_PASSWORD}/$email/$token")
+                    onNavigateToResetPassword = {
+                        navController.navigate(Routes.RESET_PASSWORD)
                     }
                 )
             }
-            composable("${Routes.RESET_PASSWORD}/{email}/{token}") { backStackEntry ->
-                val userEmail = backStackEntry.savedStateHandle.get<String>("email") ?: ""
-                val verificationToken = backStackEntry.savedStateHandle.get<String>("token") ?: ""
+            composable(Routes.RESET_PASSWORD) {
                 ResetPasswordScreen(
-                    userEmail = userEmail,
-                    verificationToken = verificationToken,
                     authRepository = appContainer.authRepository,
                     onResetSuccess = {
                         navController.navigate(Routes.SIGN_IN) {
@@ -286,18 +288,18 @@ fun MusclePlayNavigation(
                 )
             }
             composable(Routes.SIGN_UP) {
-                SignUpScreen(onNavigateToOtp = { email, password ->
-                    navController.navigate("${Routes.OTP_VERIFICATION}/$email/$password")
-                }, onNavigateToSignIn = {
-                    navController.popBackStack()
-                })
+                SignUpScreen(
+                    authRepository = appContainer.authRepository,
+                    onNavigateToOtp = {
+                        navController.navigate(Routes.OTP_VERIFICATION)
+                    },
+                    onNavigateToSignIn = {
+                        navController.popBackStack()
+                    }
+                )
             }
-            composable("${Routes.OTP_VERIFICATION}/{email}/{password}") { backStackEntry ->
-                val userEmail = backStackEntry.savedStateHandle.get<String>("email") ?: ""
-                val userPassword = backStackEntry.savedStateHandle.get<String>("password") ?: ""
+            composable(Routes.OTP_VERIFICATION) {
                 OtpVerificationScreen(
-                    userEmail = userEmail,
-                    userPassword = userPassword,
                     authRepository = appContainer.authRepository,
                     onOtpVerified = {
                         val isProfileComplete =
@@ -326,6 +328,8 @@ fun MusclePlayNavigation(
             }
             composable(Routes.HOME) {
                 HomeScreen(
+                    dashboardRepository = appContainer.dashboardRepository,
+                    userSessionRepository = appContainer.userSessionRepository,
                     notificationRepository = appContainer.notificationRepository,
                     onNavigateToDiet = { navController.navigate(Routes.DIET_HOME) },
                     onNavigateToWorkouts = { navController.navigate(Routes.WORKOUTS) },
@@ -382,6 +386,8 @@ fun MusclePlayNavigation(
             composable(Routes.PROFILE) {
                 ProfileScreen(
                     authRepository = appContainer.authRepository,
+                    dashboardRepository = appContainer.dashboardRepository,
+                    userSessionRepository = appContainer.userSessionRepository,
                     onNavigateToSettings = { navController.navigate(Routes.PROFILE_SETTINGS) },
                     onNavigateToHelp = { navController.navigate(Routes.PROFILE_HELP) },
                     onNavigateToDiagnostics = { navController.navigate(Routes.PROFILE_DIAGNOSTICS) },

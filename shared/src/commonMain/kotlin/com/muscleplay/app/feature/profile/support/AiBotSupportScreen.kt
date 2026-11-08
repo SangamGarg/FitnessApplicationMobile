@@ -286,7 +286,12 @@ private fun ChatBubbleItem(
                 message.actionText?.let { action ->
                     message.actionRoute?.let { route ->
                         Button(
-                            onClick = { onActionClick(route) },
+                            onClick = {
+                                val safeRoute = com.muscleplay.app.navigation.NotificationRouteWhitelist.mapToSafeRoute(route)
+                                if (!safeRoute.isNullOrBlank()) {
+                                    onActionClick(safeRoute)
+                                }
+                            },
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary),
                             modifier = Modifier.padding(top = 4.dp)

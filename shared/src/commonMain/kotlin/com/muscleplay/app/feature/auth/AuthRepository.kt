@@ -22,10 +22,17 @@ sealed class SessionState {
     object SessionExpired : SessionState()
 }
 
+data class AuthFlowData(
+    val pendingEmail: String = "",
+    val pendingPassword: String = "",
+    val pendingVerificationToken: String = "",
+)
+
 class AuthRepository(
     private val apiClient: ApiClient = ApiClient(),
     private val firebaseAuthRepository: FirebaseAuthRepository = createFirebaseAuthRepository(),
     val tokenStorageManager: TokenStorageManager = TokenStorageManager(),
+    private val userSessionRepository: com.muscleplay.app.core.network.auth.UserSessionRepository? = null,
 ) {
     init {
         apiClient.tokenStorageManager = tokenStorageManager
@@ -39,6 +46,21 @@ class AuthRepository(
         }
     )
     val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
+
+    private val _authFlowData = MutableStateFlow(AuthFlowData())
+    val authFlowData: StateFlow<AuthFlowData> = _authFlowData.asStateFlow()
+
+    fun setPendingSignUpData(email: String, pass: String) {
+        _authFlowData.value = AuthFlowData(pendingEmail = email, pendingPassword = pass)
+    }
+
+    fun setPendingResetPasswordData(email: String, token: String) {
+        _authFlowData.value = AuthFlowData(pendingEmail = email, pendingVerificationToken = token)
+    }
+
+    fun clearAuthFlowData() {
+        _authFlowData.value = AuthFlowData()
+    }
 
     suspend fun sendSignupOtp(email: String): NetworkResult<String> {
         return when (val res = apiClient.sendSignupOtp(email)) {
@@ -75,9 +97,14 @@ class AuthRepository(
 
     suspend fun verifyForgotPasswordOtp(email: String, otp: String): NetworkResult<String> {
         return when (val res = apiClient.verifyForgotPasswordOtp(email, otp)) {
-            is NetworkResult.Success -> NetworkResult.Success(
-                res.data.verificationToken ?: "vt_fp_token_verified"
-            )
+            is NetworkResult.Success -> {
+                val token = res.data.verificationToken
+                if (token.isNullOrBlank()) {
+                    NetworkResult.Error(400, "Verification token missing from server response.")
+                } else {
+                    NetworkResult.Success(token)
+                }
+            }
 
             is NetworkResult.Error -> NetworkResult.Error(res.statusCode, res.message)
             is NetworkResult.Exception -> NetworkResult.Exception(res.throwable)
@@ -117,8 +144,8 @@ class AuthRepository(
             firebaseAuthRepository.signInWithEmail(email, pass)
         }
 
-        val firebaseUid = when (firebaseResult) {
-            is AuthResult.Success -> firebaseResult.data
+        when (firebaseResult) {
+            is AuthResult.Success -> { /* Continue */ }
             is AuthResult.Error -> {
                 _sessionState.value = SessionState.Unauthenticated
                 return NetworkResult.Error(401, firebaseResult.message)
@@ -128,7 +155,10 @@ class AuthRepository(
         _sessionState.value = SessionState.BackendExchangePending
 
         val realFirebaseToken = firebaseAuthRepository.getIdToken(forceRefresh = false)
-            ?: "firebase_token_$firebaseUid"
+        if (realFirebaseToken.isNullOrBlank()) {
+            _sessionState.value = SessionState.Unauthenticated
+            return NetworkResult.Error(401, "Failed to retrieve authentication token. Please try again.")
+        }
 
         return when (val backendRes = apiClient.loginRegister(realFirebaseToken)) {
             is NetworkResult.Success -> {
@@ -161,7 +191,12 @@ class AuthRepository(
     }
 
     suspend fun submitProfileCompletion(profile: UserOnboardingProfile): NetworkResult<Boolean> {
-        val accessToken = tokenStorageManager.accessToken ?: "mock_access_token_123"
+        val accessToken = tokenStorageManager.accessToken
+        if (accessToken.isNullOrBlank()) {
+            _sessionState.value = SessionState.Unauthenticated
+            return NetworkResult.Error(401, "Authentication token missing. Please sign in again.")
+        }
+
         val dto = UserDetailsDto(
             name = profile.fullName,
             gender = profile.gender.name,
@@ -177,6 +212,18 @@ class AuthRepository(
         return when (val res = apiClient.addUserDetails(accessToken, dto)) {
             is NetworkResult.Success -> {
                 tokenStorageManager.updateProfileComplete(true)
+                userSessionRepository?.updateProfile(
+                    com.muscleplay.app.core.network.auth.UserProfile(
+                        name = profile.fullName,
+                        gender = profile.gender.name,
+                        age = profile.age,
+                        heightCm = profile.heightCm,
+                        weightKg = profile.weightKg,
+                        activityLevel = profile.activityLevel.name,
+                        goal = profile.fitnessGoal.name,
+                        profileCompleted = true
+                    )
+                )
                 _sessionState.value = SessionState.Authenticated
                 NetworkResult.Success(true)
             }
@@ -187,13 +234,15 @@ class AuthRepository(
     }
 
     suspend fun logout(logoutEverywhere: Boolean = false): Boolean {
-        val accessToken = tokenStorageManager.accessToken ?: "mock_access_token_123"
+        val accessToken = tokenStorageManager.accessToken ?: ""
         val refreshToken = tokenStorageManager.refreshToken ?: ""
-        if (refreshToken.isNotBlank()) {
+        if (refreshToken.isNotBlank() && accessToken.isNotBlank()) {
             apiClient.logout(refreshToken, logoutEverywhere, accessToken)
         }
         firebaseAuthRepository.signOut()
         tokenStorageManager.clearSession()
+        userSessionRepository?.clearSession()
+        clearAuthFlowData()
         _sessionState.value = SessionState.Unauthenticated
         return true
     }

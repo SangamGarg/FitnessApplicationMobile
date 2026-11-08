@@ -295,8 +295,9 @@ fun NotificationCenterScreen(
                             onClick = {
                                 coroutineScope.launch {
                                     notificationRepository?.markAsRead(item.id)
-                                    item.targetRoute?.let { route ->
-                                        if (route.isNotBlank()) onNavigateToRoute(route)
+                                    val safeRoute = com.muscleplay.app.navigation.NotificationRouteWhitelist.mapToSafeRoute(item.targetRoute)
+                                    if (!safeRoute.isNullOrBlank()) {
+                                        onNavigateToRoute(safeRoute)
                                     }
                                 }
                             }

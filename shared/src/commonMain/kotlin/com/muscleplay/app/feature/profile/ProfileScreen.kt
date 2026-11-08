@@ -71,6 +71,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -103,6 +104,11 @@ private val OrangePrimary = Color(0xFFFF5722)
 private val OrangeSecondary = Color(0xFFFF9800)
 private val OrangeGlow = Color(0xFFFF3D00)
 private val DarkBackground = Color(0xFF0F0F17)
+private val CardBackground = Color(0xFF181824)
+private val CardBorderColor = Color(0xFF2A283A)
+private val CyanAccent = Color(0xFF00E5FF)
+private val GreenAccent = Color(0xFF00E676)
+private val TextMuted = Color(0xFF9E9B9E)
 
 data class ProgressPhoto(
     val id: String,
@@ -216,6 +222,8 @@ val socialHandlesList = listOf(
 @Composable
 fun ProfileScreen(
     authRepository: AuthRepository? = null,
+    dashboardRepository: com.muscleplay.app.feature.home.data.DashboardRepository? = null,
+    userSessionRepository: com.muscleplay.app.core.network.auth.UserSessionRepository? = null,
     onNavigateToSettings: () -> Unit = {},
     onNavigateToHelp: () -> Unit = {},
     onNavigateToDiagnostics: () -> Unit = {},
@@ -225,6 +233,32 @@ fun ProfileScreen(
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+
+    val sessionProfile by (userSessionRepository?.userProfile?.collectAsState() ?: remember { mutableStateOf(null) })
+
+    val viewModel = remember(dashboardRepository) {
+        dashboardRepository?.let { com.muscleplay.app.feature.home.DashboardViewModel(it, coroutineScope) }
+    }
+
+    val uiState by (viewModel?.uiState?.collectAsState() ?: remember {
+        mutableStateOf<com.muscleplay.app.feature.home.DashboardUiState>(
+            com.muscleplay.app.feature.home.DashboardUiState.Success(createSampleProfileDashboardDto())
+        )
+    })
+
+    // Only load dashboard if sessionProfile is not present in memory
+    LaunchedEffect(sessionProfile) {
+        if (sessionProfile == null) {
+            viewModel?.loadDashboard(isRefresh = false)
+        }
+    }
+
+    val dashboardData = (uiState as? com.muscleplay.app.feature.home.DashboardUiState.Success)?.data
+    val userName = sessionProfile?.name ?: dashboardData?.user?.name ?: "Alex Fitness"
+    val userEmail = sessionProfile?.email ?: dashboardData?.user?.email ?: "alex.fitness@muscleplay.com"
+    val membershipStatus = if (sessionProfile?.profileCompleted == true || dashboardData?.user?.profileCompleted == true) "Pro Member" else "Member"
+    val streakDays = dashboardData?.workoutAnalytics?.activeDays?.toInt() ?: 12
+    val mpCoins = dashboardData?.wallet?.balanceCoins?.toInt() ?: 1250
 
     val expandedHeaderHeight = 250.dp
     val collapsedHeaderHeight = 64.dp
@@ -294,24 +328,25 @@ fun ProfileScreen(
             .fillMaxSize()
             .background(DarkBackground)
     ) {
+        // Ambient Background Radial Glow
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(OrangeGlow.copy(alpha = pulseAlpha), Color.Transparent),
-                    center = Offset(w * 0.8f, h * 0.2f),
-                    radius = w * 0.6f
+                    colors = listOf(OrangeGlow.copy(alpha = pulseAlpha * 0.7f), Color.Transparent),
+                    center = Offset(w * 0.85f, h * 0.15f),
+                    radius = w * 0.75f
                 )
             )
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        OrangeSecondary.copy(alpha = pulseAlpha * 0.6f),
+                        OrangeSecondary.copy(alpha = pulseAlpha * 0.5f),
                         Color.Transparent
                     ),
                     center = Offset(w * 0.15f, h * 0.8f),
-                    radius = w * 0.5f
+                    radius = w * 0.65f
                 )
             )
         }
@@ -326,10 +361,10 @@ fun ProfileScreen(
                     Snackbar(
                         snackbarData = data,
                         shape = RoundedCornerShape(16.dp),
-                        containerColor = Color(0xFF181824),
+                        containerColor = CardBackground,
                         contentColor = Color.White,
                         actionColor = OrangeSecondary,
-                        dismissActionContentColor = Color.White.copy(alpha = 0.7f)
+                        dismissActionContentColor = TextMuted
                     )
                 }
             }
@@ -342,11 +377,11 @@ fun ProfileScreen(
                 // Pinned Header with Level & XP Bar
                 Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp)) {
                     GlassCollapsibleProfileCard(
-                        userName = "Alex Fitness",
-                        userEmail = "alex.fitness@muscleplay.com",
-                        membershipStatus = "Pro Member",
-                        streakDays = 12,
-                        mpCoins = 1250,
+                        userName = userName,
+                        userEmail = userEmail,
+                        membershipStatus = membershipStatus,
+                        streakDays = streakDays,
+                        mpCoins = mpCoins,
                         collapseProgress = collapseProgress,
                         expandedHeight = expandedHeaderHeight,
                         collapsedHeight = collapsedHeaderHeight,
@@ -491,8 +526,8 @@ fun ProfileScreen(
             selectedBadgeDetail?.let { badge ->
                 AlertDialog(
                     onDismissRequest = { selectedBadgeDetail = null },
-                    shape = RoundedCornerShape(28.dp),
-                    containerColor = Color(0xFF181824),
+                    shape = RoundedCornerShape(24.dp),
+                    containerColor = CardBackground,
                     icon = {
                         Box(
                             modifier = Modifier
@@ -523,7 +558,7 @@ fun ProfileScreen(
                                 color = OrangeSecondary
                             )
                             Surface(
-                                color = if (badge.isUnlocked) Color(0xFF4CAF50).copy(alpha = 0.2f) else Color.White.copy(
+                                color = if (badge.isUnlocked) GreenAccent.copy(alpha = 0.2f) else Color.White.copy(
                                     alpha = 0.08f
                                 ),
                                 shape = RoundedCornerShape(8.dp)
@@ -532,9 +567,7 @@ fun ProfileScreen(
                                     text = if (badge.isUnlocked) "UNLOCKED 🎉" else "LOCKED 🔒",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (badge.isUnlocked) Color(0xFF4CAF50) else Color.White.copy(
-                                        alpha = 0.6f
-                                    ),
+                                    color = if (badge.isUnlocked) GreenAccent else TextMuted,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
@@ -553,7 +586,7 @@ fun ProfileScreen(
                     },
                     dismissButton = {
                         TextButton(onClick = { selectedBadgeDetail = null }) {
-                            Text("Close", color = Color.White.copy(alpha = 0.6f))
+                            Text("Close", color = TextMuted)
                         }
                     }
                 )
@@ -566,8 +599,8 @@ fun ProfileScreen(
 
                 AlertDialog(
                     onDismissRequest = { showCompareDialog = false },
-                    shape = RoundedCornerShape(28.dp),
-                    containerColor = Color(0xFF181824),
+                    shape = RoundedCornerShape(24.dp),
+                    containerColor = CardBackground,
                     icon = {
                         Box(
                             modifier = Modifier
@@ -596,7 +629,7 @@ fun ProfileScreen(
                             Text(
                                 "Side-by-side milestone comparison:",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.7f)
+                                color = TextMuted
                             )
 
                             Row(
@@ -626,8 +659,8 @@ fun ProfileScreen(
             if (showExportDialog) {
                 AlertDialog(
                     onDismissRequest = { showExportDialog = false },
-                    shape = RoundedCornerShape(28.dp),
-                    containerColor = Color(0xFF181824),
+                    shape = RoundedCornerShape(24.dp),
+                    containerColor = CardBackground,
                     icon = {
                         Box(
                             modifier = Modifier
@@ -656,7 +689,7 @@ fun ProfileScreen(
                             Text(
                                 "Choose your preferred report export format:",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.7f)
+                                color = TextMuted
                             )
 
                             Button(
@@ -691,7 +724,7 @@ fun ProfileScreen(
                     confirmButton = {},
                     dismissButton = {
                         TextButton(onClick = { showExportDialog = false }) {
-                            Text("Cancel", color = Color.White.copy(alpha = 0.6f))
+                            Text("Cancel", color = TextMuted)
                         }
                     }
                 )
@@ -701,8 +734,8 @@ fun ProfileScreen(
             if (showLogoutDialog) {
                 AlertDialog(
                     onDismissRequest = { showLogoutDialog = false },
-                    shape = RoundedCornerShape(28.dp),
-                    containerColor = Color(0xFF181824),
+                    shape = RoundedCornerShape(24.dp),
+                    containerColor = CardBackground,
                     icon = {
                         Box(
                             modifier = Modifier
@@ -732,7 +765,7 @@ fun ProfileScreen(
                             Text(
                                 text = "Choose your preferred sign-out option:",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.7f)
+                                color = TextMuted
                             )
 
                             // Option 1: Logout from This Device
@@ -778,7 +811,7 @@ fun ProfileScreen(
                     confirmButton = {},
                     dismissButton = {
                         TextButton(onClick = { showLogoutDialog = false }) {
-                            Text("Cancel", color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+                            Text("Cancel", color = TextMuted, fontWeight = FontWeight.Bold)
                         }
                     }
                 )
@@ -797,8 +830,8 @@ fun ProfileScreen(
             if (showRateDialog) {
                 AlertDialog(
                     onDismissRequest = { showRateDialog = false },
-                    shape = RoundedCornerShape(28.dp),
-                    containerColor = Color(0xFF181824),
+                    shape = RoundedCornerShape(24.dp),
+                    containerColor = CardBackground,
                     icon = {
                         Box(
                             modifier = Modifier
@@ -864,7 +897,7 @@ fun ProfileScreen(
                     },
                     dismissButton = {
                         TextButton(onClick = { showRateDialog = false }) {
-                            Text("Later", color = Color.White.copy(alpha = 0.6f))
+                            Text("Later", color = TextMuted)
                         }
                     }
                 )
@@ -875,8 +908,8 @@ fun ProfileScreen(
 
                 AlertDialog(
                     onDismissRequest = { showFollowDialog = false },
-                    shape = RoundedCornerShape(28.dp),
-                    containerColor = Color(0xFF181824),
+                    shape = RoundedCornerShape(24.dp),
+                    containerColor = CardBackground,
                     icon = {
                         Box(
                             modifier = Modifier
@@ -949,11 +982,8 @@ fun GlassProgressGallerySection(
             Surface(
                 onClick = { onImageClick(photo) },
                 shape = RoundedCornerShape(18.dp),
-                color = Color.White.copy(alpha = 0.08f),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    OrangePrimary.copy(alpha = 0.3f)
-                ),
+                color = CardBackground,
+                border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor),
                 modifier = Modifier.width(130.dp).height(120.dp)
             ) {
                 Column(
@@ -1006,8 +1036,8 @@ fun GlassProfileMenuItem(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        color = Color.White.copy(alpha = 0.06f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
+        color = CardBackground,
+        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor)
     ) {
         Row(
             modifier = Modifier
@@ -1046,7 +1076,7 @@ fun GlassProfileMenuItem(
                     Text(
                         subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.65f),
+                        color = TextMuted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1073,7 +1103,7 @@ fun GlassFeedbackBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = Color(0xFF181824)
+        containerColor = CardBackground
     ) {
         Column(
             modifier = Modifier
@@ -1090,7 +1120,7 @@ fun GlassFeedbackBottomSheet(
             Text(
                 "Your feedback directly shapes new features for MusclePlay!",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.7f)
+                color = TextMuted
             )
 
             OutlinedTextField(
@@ -1099,7 +1129,7 @@ fun GlassFeedbackBottomSheet(
                 placeholder = {
                     Text(
                         "Describe your feedback or feature request...",
-                        color = Color.White.copy(alpha = 0.4f)
+                        color = TextMuted
                     )
                 },
                 modifier = Modifier.fillMaxWidth().height(120.dp),
@@ -1108,7 +1138,7 @@ fun GlassFeedbackBottomSheet(
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White,
                     focusedBorderColor = OrangePrimary,
-                    unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
+                    unfocusedBorderColor = CardBorderColor
                 )
             )
 
@@ -1132,9 +1162,9 @@ fun GlassFeedbackBottomSheet(
 @Composable
 fun ProfileStatBadge(label: String, value: String) {
     Surface(
-        color = Color.White.copy(alpha = 0.08f),
+        color = Color.White.copy(alpha = 0.05f),
         shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor)
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -1143,7 +1173,7 @@ fun ProfileStatBadge(label: String, value: String) {
             Text(
                 label,
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.6f)
+                color = TextMuted
             )
             Text(
                 value,
@@ -1204,10 +1234,10 @@ private fun GlassBadgeCard(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(18.dp),
-        color = if (badge.isUnlocked) Color.White.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.04f),
+        color = CardBackground,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (badge.isUnlocked) OrangePrimary.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.10f)
+            if (badge.isUnlocked) OrangePrimary.copy(alpha = 0.5f) else CardBorderColor
         ),
         modifier = Modifier.width(100.dp).height(90.dp)
     ) {
@@ -1235,7 +1265,7 @@ private fun GlassBadgeCard(
                     text = if (badge.isUnlocked) "Unlocked" else "Locked",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Medium,
-                    color = if (badge.isUnlocked) OrangeSecondary else Color.White.copy(alpha = 0.5f),
+                    color = if (badge.isUnlocked) OrangeSecondary else TextMuted,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }
@@ -1250,9 +1280,9 @@ private fun ComparePhotoPreviewCard(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        color = Color.White.copy(alpha = 0.08f),
+        color = CardBackground,
         shape = RoundedCornerShape(16.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.3f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor),
         modifier = modifier
     ) {
         Column(
@@ -1291,7 +1321,7 @@ private fun ComparePhotoPreviewCard(
             Text(
                 photo.date,
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.6f)
+                color = TextMuted
             )
         }
     }
@@ -1306,8 +1336,8 @@ private fun SocialHandleRowItem(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Color.White.copy(alpha = 0.06f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
+        color = CardBackground,
+        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor)
     ) {
         Row(
             modifier = Modifier
@@ -1433,7 +1463,7 @@ fun GlassCollapsibleProfileCard(
                     Text(
                         text = userEmail,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.7f)
+                        color = TextMuted
                     )
 
                     Spacer(modifier = Modifier.height(6.dp))
@@ -1478,7 +1508,7 @@ fun GlassCollapsibleProfileCard(
                                 .height(4.dp)
                                 .clip(RoundedCornerShape(2.dp)),
                             color = OrangePrimary,
-                            trackColor = Color.White.copy(alpha = 0.1f)
+                            trackColor = CardBorderColor
                         )
                     }
 
@@ -1601,26 +1631,30 @@ fun GlassContainer(
     Box(
         modifier = modifier
             .clip(shape)
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.12f),
-                        Color.White.copy(alpha = 0.04f)
-                    )
-                )
-            )
+            .background(CardBackground)
             .border(
                 width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.35f),
-                        OrangePrimary.copy(alpha = 0.25f),
-                        Color.White.copy(alpha = 0.08f)
-                    )
-                ),
+                color = CardBorderColor,
                 shape = shape
             )
     ) {
         content()
     }
+}
+
+private fun createSampleProfileDashboardDto(): com.muscleplay.app.core.network.dto.DashboardResponseDto {
+    return com.muscleplay.app.core.network.dto.DashboardResponseDto(
+        user = com.muscleplay.app.core.network.dto.DashboardResponseDto.UserSummary(
+            userId = "1",
+            email = "alex.fitness@muscleplay.com",
+            name = "Alex Fitness",
+            profileCompleted = true
+        ),
+        workoutAnalytics = com.muscleplay.app.core.network.dto.WorkoutAnalyticsOverviewResponse(
+            activeDays = 12
+        ),
+        wallet = com.muscleplay.app.core.network.dto.DashboardResponseDto.WalletSummary(
+            balanceCoins = 1250
+        )
+    )
 }

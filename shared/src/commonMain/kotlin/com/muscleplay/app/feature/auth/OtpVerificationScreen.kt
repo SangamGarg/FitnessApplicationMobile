@@ -48,6 +48,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -94,6 +95,9 @@ fun OtpVerificationScreen(
     onOtpVerified: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val authFlowData by (authRepository?.authFlowData?.collectAsState() ?: remember { mutableStateOf(AuthFlowData()) })
+    val targetEmail = userEmail.ifBlank { authFlowData.pendingEmail }
+    val targetPassword = userPassword.ifBlank { authFlowData.pendingPassword }
 
     var otpText by remember { mutableStateOf("") }
     var isVerifying by remember { mutableStateOf(false) }
@@ -135,7 +139,7 @@ fun OtpVerificationScreen(
 
     // Send OTP API call on entrance
     LaunchedEffect(Unit) {
-        authRepository?.sendSignupOtp(userEmail)
+        authRepository?.sendSignupOtp(targetEmail)
         delay(300L.milliseconds)
         openKeyboard()
     }
@@ -146,7 +150,7 @@ fun OtpVerificationScreen(
         isVerifying = true
         errorMessage = null
         coroutineScope.launch {
-            val verifyResult = authRepository?.verifySignupOtp(userEmail, otpText)
+            val verifyResult = authRepository?.verifySignupOtp(targetEmail, otpText)
             if (verifyResult is NetworkResult.Error) {
                 isVerifying = false
                 errorMessage = verifyResult.message
@@ -161,7 +165,7 @@ fun OtpVerificationScreen(
             } else {
                 // Post-Verification (HTTP 200 Success): proceed to loginRegister
                 val authResult = authRepository?.authenticateWithEmail(
-                    userEmail, userPassword, isSignUp = true
+                    targetEmail, targetPassword, isSignUp = true
                 )
                 isVerifying = false
                 if (authResult is NetworkResult.Error) {
@@ -270,7 +274,7 @@ fun OtpVerificationScreen(
                             Spacer(modifier = Modifier.height(2.dp))
 
                             Text(
-                                text = userEmail,
+                                text = targetEmail,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = OrangeSecondary,
@@ -407,14 +411,14 @@ fun OtpVerificationScreen(
                                                 color = OrangePrimary,
                                                 modifier = Modifier.clickable(enabled = !isVerifying) {
                                                     coroutineScope.launch {
-                                                        authRepository?.sendSignupOtp(userEmail)
+                                                        authRepository?.sendSignupOtp(targetEmail)
                                                     }
                                                     timerSeconds = RESEND_TIMER_SECONDS
                                                     canResend = false
                                                     otpText = ""
                                                     errorMessage = null
                                                     snackbarMessage =
-                                                        "New OTP code sent to $userEmail"
+                                                        "New OTP code sent to $targetEmail"
                                                     openKeyboard()
                                                 })
                                         }

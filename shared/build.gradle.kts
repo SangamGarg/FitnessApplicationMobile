@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.sqldelight)
+    kotlin("plugin.serialization") version "2.4.21"
 }
 
 kotlin {
@@ -55,6 +56,7 @@ kotlin {
             implementation(libs.google.firebase.auth)
             implementation(libs.firebase.messaging)
             implementation(libs.androidx.core.ktx)
+            implementation("io.ktor:ktor-client-okhttp:3.1.1")
         }
         commonMain.dependencies {
             implementation(libs.firebase.kmp.auth)
@@ -70,9 +72,16 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.sqldelight.runtime)
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+            implementation("io.ktor:ktor-client-core:3.1.1")
+            implementation("io.ktor:ktor-client-content-negotiation:3.1.1")
+            implementation("io.ktor:ktor-serialization-kotlinx-json:3.1.1")
+            implementation("io.ktor:ktor-client-logging:3.1.1")
+            implementation("io.ktor:ktor-client-auth:3.1.1")
         }
         iosMain.dependencies {
             implementation(libs.sqldelight.native.driver)
+            implementation("io.ktor:ktor-client-darwin:3.1.1")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

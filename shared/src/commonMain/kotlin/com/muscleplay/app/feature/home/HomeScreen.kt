@@ -1,69 +1,97 @@
 package com.muscleplay.app.feature.home
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import kotlinx.coroutines.launch
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Fastfood
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Gamepad
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
-import kotlin.math.roundToInt
+import com.muscleplay.app.core.network.auth.UserProfile
+import com.muscleplay.app.core.network.dto.DashboardResponseDto
+import com.muscleplay.app.feature.home.data.DashboardRepository
+import kotlinx.coroutines.launch
 
 private val OrangePrimary = Color(0xFFFF5722)
 private val OrangeSecondary = Color(0xFFFF9800)
 private val OrangeGlow = Color(0xFFFF3D00)
 private val DarkBackground = Color(0xFF0F0F17)
-
-private val ActivityHeaderRowHeight = 40.dp
-
-data class DayStreakInfo(
-    val dayName: String,
-    val dateNum: Int,
-    val isCompleted: Boolean,
-    val isToday: Boolean,
-    val caloriesBurned: Int,
-    val stepsTaken: Int,
-)
+private val CardBackground = Color(0xFF181824)
+private val CardBorderColor = Color(0xFF2A283A)
+private val CyanAccent = Color(0xFF00E5FF)
+private val GreenAccent = Color(0xFF00E676)
+private val BlueAccent = Color(0xFF2979FF)
+private val TextMuted = Color(0xFF9E9B9E)
 
 @Composable
 fun HomeScreen(
+    dashboardRepository: DashboardRepository? = null,
+    userSessionRepository: com.muscleplay.app.core.network.auth.UserSessionRepository? = null,
     notificationRepository: com.muscleplay.app.core.network.notification.NotificationRepository? = null,
     onNavigateToDiet: () -> Unit = {},
     onNavigateToWorkouts: () -> Unit = {},
@@ -74,1458 +102,380 @@ fun HomeScreen(
     onNavigateToCoinsHub: () -> Unit = {},
     onNavigateToNotifications: () -> Unit = {},
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.9f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
-
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 0.45f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
-    )
-
     val coroutineScope = rememberCoroutineScope()
+    val sessionProfile by (userSessionRepository?.userProfile?.collectAsState()
+        ?: remember { mutableStateOf(null) })
+
+    val viewModel = remember(dashboardRepository) {
+        dashboardRepository?.let { DashboardViewModel(it, coroutineScope) }
+    }
+
+    val uiState by (viewModel?.uiState?.collectAsState() ?: remember {
+        mutableStateOf<DashboardUiState>(DashboardUiState.Success(createSampleDashboardDto()))
+    })
+
+    LaunchedEffect(Unit) {
+        viewModel?.loadDashboard(isRefresh = false)
+    }
 
     com.muscleplay.app.core.network.notification.RequestNotificationPermissionEffect(
         onRequestCompleted = {
             coroutineScope.launch {
                 notificationRepository?.registerCurrentDevice()
             }
-        }
-    )
-
-    var currentWaterMl by remember { mutableIntStateOf(1750) }
-    var isFabMenuExpanded by remember { mutableStateOf(false) }
-
-    val density = LocalDensity.current
-    val expandedCardHeight = 205.dp
-    val collapsedCardHeight = 84.dp
-    val headerTopPadding = 20.dp
-    val headerCardSpacing = 16.dp
-
-    val cardRangePx = with(density) { (expandedCardHeight - collapsedCardHeight).toPx() }
-    val spacingPx = with(density) { headerCardSpacing.toPx() }
-
-    var headerBlockPx by remember { mutableFloatStateOf(with(density) { 160.dp.toPx() }) }
-
-    val totalRangePx = headerBlockPx + cardRangePx
-    val currentTotalRange by rememberUpdatedState(totalRangePx)
-
-    var collapsedPx by remember { mutableFloatStateOf(0f) }
-
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                val delta = available.y
-                if (delta >= 0f) return Offset.Zero
-                val old = collapsedPx
-                collapsedPx = (old - delta).coerceIn(0f, currentTotalRange)
-                return Offset(0f, -(collapsedPx - old))
-            }
-
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource,
-            ): Offset {
-                val delta = available.y
-                if (delta <= 0f) return Offset.Zero
-                val old = collapsedPx
-                collapsedPx = (old - delta).coerceIn(0f, currentTotalRange)
-                return Offset(0f, old - collapsedPx)
-            }
-        }
-    }
-
-    val currentCollapsedPx = collapsedPx.coerceIn(0f, totalRangePx)
-    val headerShiftPx = currentCollapsedPx.coerceAtMost(headerBlockPx)
-    val cardCollapseProgress = if (cardRangePx > 0f) {
-        ((currentCollapsedPx - headerBlockPx) / cardRangePx).coerceIn(0f, 1f)
-    } else 0f
-    val cardHeight = lerp(expandedCardHeight, collapsedCardHeight, cardCollapseProgress)
-    val topSectionHeight = with(density) { (headerBlockPx - headerShiftPx).toDp() } + cardHeight
+        })
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DarkBackground)
+        modifier = Modifier.fillMaxSize().background(DarkBackground)
     ) {
+        // Ambient background gradient glow
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val canvasWidth = size.width
-            val canvasHeight = size.height
-
+            val w = size.width
+            val h = size.height
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(OrangeGlow.copy(alpha = pulseAlpha), Color.Transparent),
-                    center = Offset(canvasWidth * 0.85f, canvasHeight * 0.15f),
-                    radius = canvasWidth * 0.7f * pulseScale
-                ),
-                center = Offset(canvasWidth * 0.85f, canvasHeight * 0.15f),
-                radius = canvasWidth * 0.7f * pulseScale
+                    colors = listOf(OrangeGlow.copy(alpha = 0.25f), Color.Transparent),
+                    center = Offset(w * 0.85f, h * 0.15f),
+                    radius = w * 0.8f
+                )
             )
-
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(
-                        OrangeSecondary.copy(alpha = pulseAlpha * 0.7f),
-                        Color.Transparent
-                    ),
-                    center = Offset(canvasWidth * 0.15f, canvasHeight * 0.75f),
-                    radius = canvasWidth * 0.6f
-                ),
-                center = Offset(canvasWidth * 0.15f, canvasHeight * 0.75f),
-                radius = canvasWidth * 0.6f
+                    colors = listOf(OrangeSecondary.copy(alpha = 0.15f), Color.Transparent),
+                    center = Offset(w * 0.15f, h * 0.75f),
+                    radius = w * 0.7f
+                )
             )
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp)
-                .nestedScroll(nestedScrollConnection)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(topSectionHeight)
-                    .clipToBounds()
-                    .pointerInput(currentTotalRange) {
-                        detectVerticalDragGestures { change, dragAmount ->
-                            change.consume()
-                            val old = collapsedPx
-                            collapsedPx = (old - dragAmount).coerceIn(0f, totalRangePx)
-                        }
-                    }
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight(Alignment.Top, unbounded = true)
-                        .offset { IntOffset(0, -headerShiftPx.roundToInt()) }
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onSizeChanged { headerBlockPx = it.height + spacingPx }
-                            .padding(top = headerTopPadding)
-                    ) {
-                        GlassHeaderSection(
-                            notificationRepository = notificationRepository,
-                            onNavigateToProfile = onNavigateToProfile,
-                            onNavigateToNotifications = onNavigateToNotifications
-                        )
-                    }
+        Scaffold(
+            containerColor = Color.Transparent
+        ) { innerPadding ->
+            when (val state = uiState) {
+                is DashboardUiState.Loading -> {
+                    DashboardLoadingSkeleton(
+                        modifier = Modifier.fillMaxSize().padding(innerPadding)
+                    )
+                }
 
-                    Spacer(modifier = Modifier.height(headerCardSpacing))
+                is DashboardUiState.Error -> {
+                    DashboardErrorScreen(
+                        message = state.message,
+                        onRetry = { viewModel?.loadDashboard() },
+                        modifier = Modifier.fillMaxSize().padding(innerPadding)
+                    )
+                }
 
-                    GlassActivityCard(
-                        collapseProgress = cardCollapseProgress,
-                        expandedHeight = expandedCardHeight,
-                        collapsedHeight = collapsedCardHeight
+                is DashboardUiState.Empty -> {
+                    DashboardErrorScreen(
+                        message = "No dashboard data available.",
+                        onRetry = { viewModel?.loadDashboard() },
+                        modifier = Modifier.fillMaxSize().padding(innerPadding)
+                    )
+                }
+
+                is DashboardUiState.Success -> {
+                    val data = state.data
+                    DashboardContent(
+                        data = data,
+                        sessionProfile = sessionProfile,
+                        onNavigateToDiet = onNavigateToDiet,
+                        onNavigateToWorkouts = onNavigateToWorkouts,
+                        onNavigateToGames = onNavigateToGames,
+                        onNavigateToCalculators = onNavigateToCalculators,
+                        onNavigateToProfile = onNavigateToProfile,
+                        onNavigateToNotifications = onNavigateToNotifications,
+                        modifier = Modifier.fillMaxSize().padding(innerPadding)
                     )
                 }
             }
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp)
-            ) {
-                // 1. Dynamic 7-Day Streak Calendar Row
-                item {
-                    GlassStreakCalendarRow()
-                }
-
-                // 2. Quick-Log Glass Hydration Tracker Card
-                item {
-                    GlassHydrationCard(
-                        currentWaterMl = currentWaterMl,
-                        onAddWater = { ml ->
-                            currentWaterMl = (currentWaterMl + ml).coerceAtMost(4000)
-                        }
-                    )
-                }
-
-                // 3. Smart AI Coach Daily Insight & Recommendation Card
-                item {
-                    GlassAiCoachInsightCard(
-                        onStartWorkout = onNavigateToWorkouts
-                    )
-                }
-
-                // 4. 3D Muscle Recovery Heatmap Summary Card
-                item {
-                    GlassMuscleRecoveryCard(
-                        onOpenHeatmap = onNavigateToWorkouts
-                    )
-                }
-
-                // 5. Featured Workout Card
-                item {
-                    GlassFeaturedWorkoutCard(
-                        onStartWorkout = onNavigateToWorkouts
-                    )
-                }
-
-                // 6. Daily MP Coin Challenge & Leaderboard Preview
-                item {
-                    GlassDailyCoinChallengeCard(
-                        onEnterChallenge = onNavigateToGames
-                    )
-                }
-
-                // 7. Explore & Play Quick Actions Grid
-                item {
-                    Text(
-                        text = "Explore & Play",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
-                    )
-                }
-
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            GlassQuickActionCard(
-                                title = "Diet & AI Chef",
-                                subtitle = "Smart Recipes & Scan",
-                                icon = Icons.Default.RestaurantMenu,
-                                gradientColors = listOf(OrangePrimary, OrangeGlow),
-                                modifier = Modifier.weight(1f),
-                                onClick = onNavigateToDiet
-                            )
-
-                            GlassQuickActionCard(
-                                title = "Fitness Games",
-                                subtitle = "Camera Rep Challenges",
-                                icon = Icons.Default.Gamepad,
-                                gradientColors = listOf(OrangePrimary, OrangeSecondary),
-                                modifier = Modifier.weight(1f),
-                                onClick = onNavigateToGames
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            GlassQuickActionCard(
-                                title = "Workouts",
-                                subtitle = "AI Pose & Exercises",
-                                icon = Icons.Default.FitnessCenter,
-                                gradientColors = listOf(OrangeGlow, OrangePrimary),
-                                modifier = Modifier.weight(1f),
-                                onClick = onNavigateToWorkouts
-                            )
-
-                            GlassQuickActionCard(
-                                title = "Calculators",
-                                subtitle = "BMI, BMR & Calorie",
-                                icon = Icons.Default.Calculate,
-                                gradientColors = listOf(OrangeSecondary, Color(0xFFFFC107)),
-                                modifier = Modifier.weight(1f),
-                                onClick = onNavigateToCalculators
-                            )
-                        }
-                    }
-                }
-
-                // Motivational Footer Glass Card
-                item {
-                    GlassMotivationalCard()
-                }
-            }
-        }
-
-        // Speed-Logging Glass Floating Hub (FAB)
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 90.dp, end = 20.dp)
-        ) {
-            GlassFloatingActionHub(
-                isExpanded = isFabMenuExpanded,
-                onToggleExpand = { isFabMenuExpanded = !isFabMenuExpanded },
-                onNavigateToScanner = {
-                    isFabMenuExpanded = false
-                    onNavigateToScanner()
-                },
-                onAddWaterQuick = {
-                    currentWaterMl = (currentWaterMl + 250).coerceAtMost(4000)
-                    isFabMenuExpanded = false
-                },
-                onNavigateToCoinsHub = {
-                    isFabMenuExpanded = false
-                    onNavigateToCoinsHub()
-                }
-            )
         }
     }
 }
 
-// 1. Dynamic 7-Day Streak Calendar Row Component (Fixes Image 1)
 @Composable
-private fun GlassStreakCalendarRow() {
-    var selectedDayInfo by remember { mutableStateOf<DayStreakInfo?>(null) }
+private fun DashboardContent(
+    data: DashboardResponseDto,
+    sessionProfile: UserProfile?,
+    onNavigateToDiet: () -> Unit,
+    onNavigateToWorkouts: () -> Unit,
+    onNavigateToGames: () -> Unit,
+    onNavigateToCalculators: () -> Unit,
+    onNavigateToProfile: () -> Unit,
+    onNavigateToNotifications: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val userName = sessionProfile?.name ?: data.user?.name ?: "Fitness Freak"
+    val unreadNotifications = data.notifications?.unreadCount ?: 0L
 
-    val daysList = remember {
-        listOf(
-            DayStreakInfo(
-                "Mon",
-                13,
-                isCompleted = true,
-                isToday = false,
-                caloriesBurned = 450,
-                stepsTaken = 7200
-            ),
-            DayStreakInfo(
-                "Tue",
-                14,
-                isCompleted = true,
-                isToday = false,
-                caloriesBurned = 510,
-                stepsTaken = 8100
-            ),
-            DayStreakInfo(
-                "Wed",
-                15,
-                isCompleted = true,
-                isToday = false,
-                caloriesBurned = 380,
-                stepsTaken = 6400
-            ),
-            DayStreakInfo(
-                "Thu",
-                16,
-                isCompleted = true,
-                isToday = false,
-                caloriesBurned = 420,
-                stepsTaken = 6420
-            ),
-            DayStreakInfo(
-                "Fri",
-                17,
-                isCompleted = true,
-                isToday = true,
-                caloriesBurned = 420,
-                stepsTaken = 6420
-            ),
-            DayStreakInfo(
-                "Sat",
-                18,
-                isCompleted = false,
-                isToday = false,
-                caloriesBurned = 0,
-                stepsTaken = 0
-            ),
-            DayStreakInfo(
-                "Sun",
-                19,
-                isCompleted = false,
-                isToday = false,
-                caloriesBurned = 0,
-                stepsTaken = 0
-            )
-        )
-    }
-
-    GlassContainer(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp)
+    LazyColumn(
+        modifier = modifier, contentPadding = PaddingValues(
+            start = 16.dp, end = 16.dp, top = 16.dp, bottom = 90.dp
+        ), verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(OrangePrimary.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.LocalFireDepartment,
-                            contentDescription = null,
-                            tint = OrangeSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Column {
-                        Text(
-                            "ACTIVE STREAK",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = OrangePrimary,
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            "12 Days & Counting 🔥",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White,
-                            maxLines = 1
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                Surface(
-                    color = OrangeSecondary.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text(
-                        "2 Freezes ❄️",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = OrangeSecondary,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        maxLines = 1
-                    )
-                }
-            }
-
-            // 7 Days Grid
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                daysList.forEach { day ->
-                    Surface(
-                        onClick = { selectedDayInfo = day },
-                        color = when {
-                            day.isToday -> OrangePrimary
-                            day.isCompleted -> Color.White.copy(alpha = 0.12f)
-                            else -> Color.White.copy(alpha = 0.04f)
-                        },
-                        shape = RoundedCornerShape(14.dp),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (day.isToday) OrangeSecondary else if (day.isCompleted) OrangePrimary.copy(
-                                alpha = 0.4f
-                            ) else Color.White.copy(alpha = 0.1f)
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(vertical = 6.dp, horizontal = 8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(
-                                day.dayName,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (day.isToday) Color.White else Color.White.copy(alpha = 0.6f),
-                                fontSize = 10.sp
-                            )
-                            Text(
-                                "${day.dateNum}",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White,
-                                fontSize = 13.sp
-                            )
-                            Icon(
-                                imageVector = if (day.isCompleted) Icons.Default.LocalFireDepartment else Icons.Default.Circle,
-                                contentDescription = null,
-                                tint = if (day.isCompleted) (if (day.isToday) Color.White else OrangeSecondary) else Color.White.copy(
-                                    alpha = 0.2f
-                                ),
-                                modifier = Modifier.size(12.dp)
-                            )
-                        }
-                    }
-                }
-            }
+        // 1. Top Header Row
+        item {
+            TopHeaderRow(
+                unreadCount = unreadNotifications,
+                onNotificationClick = onNavigateToNotifications,
+                onProfileClick = onNavigateToProfile
+            )
         }
-    }
 
-    selectedDayInfo?.let { info ->
-        AlertDialog(
-            onDismissRequest = { selectedDayInfo = null },
-            shape = RoundedCornerShape(24.dp),
-            containerColor = Color(0xFF181824),
-            icon = {
-                Icon(
-                    Icons.Default.LocalFireDepartment,
-                    contentDescription = null,
-                    tint = OrangeSecondary,
-                    modifier = Modifier.size(32.dp)
-                )
-            },
-            title = {
+        // 2. Greeting Section
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    "${info.dayName}, ${info.dateNum} Summary",
-                    fontWeight = FontWeight.Bold,
+                    text = "Hello, $userName! 👋",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
                     color = Color.White
                 )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Burned Calories: ${info.caloriesBurned} kcal", color = Color.White)
-                    Text("Steps Recorded: ${info.stepsTaken} steps", color = Color.White)
-                    Text(
-                        "Status: ${if (info.isCompleted) "Completed 🔥" else "Rest Day"}",
-                        fontWeight = FontWeight.Bold,
-                        color = OrangeSecondary
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { selectedDayInfo = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
-                ) {
-                    Text("Close", fontWeight = FontWeight.Bold)
-                }
-            }
-        )
-    }
-}
-
-// 2. Quick-Log Glass Hydration Tracker (Fixes Image 2)
-@Composable
-private fun GlassHydrationCard(
-    currentWaterMl: Int,
-    onAddWater: (Int) -> Unit,
-) {
-    val targetWaterMl = 3000
-    val progressFraction = (currentWaterMl.toFloat() / targetWaterMl).coerceIn(0f, 1f)
-
-    GlassContainer(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF2196F3).copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.WaterDrop,
-                            contentDescription = null,
-                            tint = Color(0xFF2196F3),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Text(
-                        text = "HYDRATION TRACKER",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF2196F3),
-                        letterSpacing = 1.2.sp,
-                        maxLines = 1
-                    )
-                }
-
                 Text(
-                    text = "${(currentWaterMl / 1000.0).toString().take(3)}L / 3.0L Target",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    maxLines = 1
+                    text = "Stronger today. Healthier tomorrow.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMuted
                 )
             }
+        }
 
-            LinearProgressIndicator(
-                progress = { progressFraction },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = Color(0xFF2196F3),
-                trackColor = Color.White.copy(alpha = 0.1f)
+        // 3. Weekly Goal Hero Banner Card
+        item {
+            WeeklyGoalCard(
+                activity = data.activity, onViewDetails = onNavigateToWorkouts
             )
+        }
 
+        // 4. Quick Action Grid (2x3)
+        item {
+            QuickActionsGrid(
+                onStartWorkout = onNavigateToWorkouts,
+                onAiCoach = onNavigateToProfile,
+                onNutrition = onNavigateToDiet,
+                onFitnessGames = onNavigateToGames,
+                onCalculators = onNavigateToCalculators,
+                onChatbot = onNavigateToProfile
+            )
+        }
+
+        // 5. Your Progress Section
+        item {
+            YourProgressSection(
+                activity = data.activity,
+                workoutAnalytics = data.workoutAnalytics,
+                onSeeAll = onNavigateToWorkouts
+            )
+        }
+
+        // 6. Personal Records Section
+        item {
+            PersonalRecordsSection(onSeeAll = onNavigateToWorkouts)
+        }
+
+        // 7. Today's Challenge & Your Nutrition Bottom Row Cards
+        item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = { onAddWater(250) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF2196F3).copy(
-                                alpha = 0.25f
-                            )
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            "+250ml",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-
-                    Button(
-                        onClick = { onAddWater(500) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            "+500ml",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                }
+                TodaysChallengeCard(
+                    recommendedWorkout = data.recommendedWorkout,
+                    onStart = onNavigateToGames,
+                    modifier = Modifier.weight(1f)
+                )
+                YourNutritionCard(
+                    nutrition = data.nutrition,
+                    onNutritionClick = onNavigateToDiet,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
 }
 
-// 3. Smart AI Coach Daily Insight Card (Fixes Image 3)
 @Composable
-private fun GlassAiCoachInsightCard(
-    onStartWorkout: () -> Unit,
+private fun TopHeaderRow(
+    unreadCount: Long,
+    onNotificationClick: () -> Unit,
+    onProfileClick: () -> Unit,
 ) {
-    GlassContainer(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        Icons.Default.SmartToy,
-                        contentDescription = null,
-                        tint = OrangeSecondary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = "AI COACH DAILY INSIGHT",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = OrangeSecondary,
-                        letterSpacing = 1.sp,
-                        maxLines = 1
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Surface(
-                    color = Color(0xFF4CAF50).copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = "100% Legs Fresh",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF4CAF50),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        maxLines = 1
-                    )
-                }
-            }
-
-            Text(
-                text = "💡 Your Legs & Quads are 100% recovered today! Ideal time for the Lower Body & Squat Blitz challenge.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.9f),
-                lineHeight = 20.sp
-            )
-
-            Button(
-                onClick = onStartWorkout,
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary),
-                modifier = Modifier.fillMaxWidth().height(44.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        "Start Recommended Workout",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = Color.White
-                    )
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-// 4. Daily MP Coin Challenge & Leaderboard Preview Card (Fixes Image 4)
-@Composable
-private fun GlassDailyCoinChallengeCard(
-    onEnterChallenge: () -> Unit,
-) {
-    GlassContainer(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        Icons.Default.EmojiEvents,
-                        contentDescription = null,
-                        tint = OrangeSecondary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Text(
-                        "DAILY MP COIN CHALLENGE",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = OrangePrimary,
-                        letterSpacing = 1.sp,
-                        maxLines = 1
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Surface(
-                    color = OrangeSecondary,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        "+50 MP Reward",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                        maxLines = 1
-                    )
-                }
-            }
-
-            Text(
-                "🔥 30 Push-Ups Liveness Challenge",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White
-            )
-
-            // Mini Leaderboard Preview Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                LeaderboardBadge("🥇 Rahul S.", "150 MP", Modifier.weight(1f))
-                LeaderboardBadge("🥈 Priya K.", "120 MP", Modifier.weight(1f))
-                LeaderboardBadge("🥉 Alex F.", "90 MP", Modifier.weight(1f))
-            }
-
-            Button(
-                onClick = onEnterChallenge,
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary),
-                modifier = Modifier.fillMaxWidth().height(44.dp)
-            ) {
-                Text("Enter Challenge ▶", fontWeight = FontWeight.Bold, color = Color.White)
-            }
-        }
-    }
-}
-
-@Composable
-private fun LeaderboardBadge(name: String, score: String, modifier: Modifier = Modifier) {
-    Surface(
-        color = Color.White.copy(alpha = 0.08f),
-        shape = RoundedCornerShape(10.dp),
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                name,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1
-            )
-            Text(
-                score,
-                style = MaterialTheme.typography.labelSmall,
-                color = OrangeSecondary,
-                maxLines = 1
-            )
-        }
-    }
-}
-
-// 5. Speed-Logging Glass Floating Hub (FAB)
-@Composable
-private fun GlassFloatingActionHub(
-    isExpanded: Boolean,
-    onToggleExpand: () -> Unit,
-    onNavigateToScanner: () -> Unit,
-    onAddWaterQuick: () -> Unit,
-    onNavigateToCoinsHub: () -> Unit,
-) {
-    Column(
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        AnimatedVisibility(
-            visible = isExpanded,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
-        ) {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FabActionPill("📸 Scan Meal", Icons.Default.CameraAlt, onNavigateToScanner)
-                FabActionPill("💧 Add Water (+250ml)", Icons.Default.WaterDrop, onAddWaterQuick)
-                FabActionPill("🪙 MP Coins Hub", Icons.Default.MonetizationOn, onNavigateToCoinsHub)
-            }
-        }
-
-        FloatingActionButton(
-            onClick = onToggleExpand,
-            containerColor = OrangePrimary,
-            contentColor = Color.White,
-            shape = CircleShape
-        ) {
-            Icon(
-                imageVector = if (isExpanded) Icons.Default.Close else Icons.Default.Add,
-                contentDescription = "Quick Hub"
-            )
-        }
-    }
-}
-
-@Composable
-private fun FabActionPill(
-    label: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-) {
-    Surface(
-        onClick = onClick,
-        color = Color(0xFF181824),
-        shape = RoundedCornerShape(20.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.5f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = OrangeSecondary,
-                modifier = Modifier.size(18.dp)
-            )
-            Text(
-                label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-        }
-    }
-}
-
-@Composable
-private fun GlassHeaderSection(
-    notificationRepository: com.muscleplay.app.core.network.notification.NotificationRepository? = null,
-    onNavigateToProfile: () -> Unit = {},
-    onNavigateToNotifications: () -> Unit = {},
-) {
-    val unreadCount by notificationRepository?.unreadCountFlow?.collectAsState()
-        ?: remember { mutableStateOf(0) }
-
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Surface(
-                color = OrangePrimary.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(20.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    OrangePrimary.copy(alpha = 0.5f)
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(OrangePrimary)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "MUSCLEPLAY",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = OrangePrimary,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 1.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = "Let's crush it! 🔥",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Medium,
-                color = Color.White
-            )
-
-            Text(
-                text = "Your daily fitness streak is waiting.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.7f)
-            )
-        }
-
+        // App Logo
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.08f))
-                    .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
-                    .clickable(onClick = onNavigateToNotifications),
+                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(
+                    Brush.linearGradient(
+                        listOf(OrangePrimary, OrangeSecondary)
+                    )
+                ), contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FitnessCenter,
+                    contentDescription = "MusclePlay Logo",
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Column {
+                Row {
+                    Text(
+                        text = "Muscle",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Play",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = OrangePrimary
+                    )
+                }
+                Text(
+                    text = "Train • Track • Transform",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted,
+                    fontSize = 10.sp
+                )
+            }
+        }
+
+        // Notification Bell + User Avatar
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box {
+                IconButton(
+                    onClick = onNotificationClick,
+                    modifier = Modifier.size(42.dp).clip(CircleShape).background(CardBackground)
+                        .border(1.dp, CardBorderColor, CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = "Notifications",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                if (unreadCount > 0) {
+                    Box(
+                        modifier = Modifier.size(12.dp).clip(CircleShape).background(OrangePrimary)
+                            .align(Alignment.TopEnd)
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier.size(42.dp).clip(CircleShape)
+                    .background(OrangeSecondary.copy(alpha = 0.3f))
+                    .border(1.5.dp, OrangePrimary, CircleShape).clickable { onProfileClick() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.Notifications,
-                    contentDescription = "Notifications",
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Profile",
                     tint = Color.White,
                     modifier = Modifier.size(24.dp)
                 )
-                if (unreadCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(2.dp)
-                            .size(18.dp)
-                            .clip(CircleShape)
-                            .background(OrangePrimary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (unreadCount > 9) "9+" else "$unreadCount",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
-                        )
-                    }
-                }
-            }
-
-            GlassContainer(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .clickable(onClick = onNavigateToProfile)
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "Profile",
-                        tint = OrangePrimary,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
             }
         }
     }
 }
 
 @Composable
-private fun GlassActivityCard(
-    collapseProgress: Float,
-    expandedHeight: Dp,
-    collapsedHeight: Dp,
+private fun WeeklyGoalCard(
+    activity: com.muscleplay.app.core.network.dto.ActivitySummaryResponseDto?,
+    onViewDetails: () -> Unit,
 ) {
-    val p = collapseProgress
+    val progressPercent = activity?.goalProgressPercent ?: 78
+    val completedWorkouts = activity?.completedActivities ?: 4L
+    val targetWorkouts = 5L
 
-    val cardHeight = lerp(expandedHeight, collapsedHeight, p)
-    val cardPadding = lerp(16.dp, 10.dp, p)
-    val cornerRadius = lerp(24.dp, 18.dp, p)
-
-    val headerHeight = ActivityHeaderRowHeight * (1f - p)
-    val headerGap = 12.dp * (1f - p)
-    val headerAlpha = (1f - p * 2.5f).coerceIn(0f, 1f)
-
-    val contentRowHeight = lerp(110.dp, 56.dp, p)
-    val ringSize = lerp(94.dp, 56.dp, p)
-    val ringStroke = lerp(10.dp, 5.dp, p)
-    val ringStatsGap = lerp(12.dp, 8.dp, p)
-
-    val expandedStatsAlpha = (1f - p * 2f).coerceIn(0f, 1f)
-    val compactStatsAlpha = (p * 2f - 1f).coerceIn(0f, 1f)
-
-    GlassContainer(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(cardHeight),
-        shape = RoundedCornerShape(cornerRadius)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(cardPadding),
-            verticalArrangement = Arrangement.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(headerHeight)
-                    .clipToBounds()
-                    .graphicsLayer { this.alpha = headerAlpha }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight(Alignment.Top, unbounded = true),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "DAILY GOAL PROGRESS",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = OrangePrimary,
-                            letterSpacing = 1.2.sp
-                        )
-                        Text(
-                            text = "Active & Moving",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-
-                    Surface(
-                        color = Color.White.copy(alpha = 0.1f),
-                        shape = CircleShape
-                    ) {
-                        Text(
-                            text = "78%",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = OrangeSecondary,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(headerGap))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(contentRowHeight),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ActivityRing(
-                    ringSize = ringSize,
-                    strokeWidth = ringStroke,
-                    collapseProgress = p
-                )
-
-                Spacer(modifier = Modifier.width(ringStatsGap))
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .wrapContentHeight(Alignment.CenterVertically, unbounded = true)
-                            .graphicsLayer { this.alpha = expandedStatsAlpha },
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        ActivityStatRow(
-                            icon = Icons.AutoMirrored.Filled.DirectionsWalk,
-                            value = "6,420",
-                            unit = "steps",
-                            color = OrangeSecondary
-                        )
-
-                        ActivityStatRow(
-                            icon = Icons.Default.Timer,
-                            value = "35",
-                            unit = "active min",
-                            color = OrangePrimary
-                        )
-
-                        ActivityStatRow(
-                            icon = Icons.Default.FitnessCenter,
-                            value = "3",
-                            unit = "workouts done",
-                            color = Color(0xFFFFB74D)
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer { this.alpha = compactStatsAlpha },
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CompactActivityStat(
-                            icon = Icons.AutoMirrored.Filled.DirectionsWalk,
-                            value = "6,420",
-                            label = "steps",
-                            color = OrangeSecondary
-                        )
-                        CompactActivityStat(
-                            icon = Icons.Default.Timer,
-                            value = "35",
-                            label = "min",
-                            color = OrangePrimary
-                        )
-                        CompactActivityStat(
-                            icon = Icons.Default.FitnessCenter,
-                            value = "3",
-                            label = "workouts",
-                            color = Color(0xFFFFB74D)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ActivityRing(
-    ringSize: Dp,
-    strokeWidth: Dp,
-    collapseProgress: Float,
-) {
-    val expandedContentAlpha = (1f - collapseProgress * 2f).coerceIn(0f, 1f)
-    val compactContentAlpha = (collapseProgress * 2f - 1f).coerceIn(0f, 1f)
-
-    Box(
-        modifier = Modifier.size(ringSize),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val strokePx = strokeWidth.toPx()
-            val arcSize = Size(size.width - strokePx, size.height - strokePx)
-
-            drawArc(
-                color = Color.White.copy(alpha = 0.1f),
-                startAngle = 135f,
-                sweepAngle = 270f,
-                useCenter = false,
-                topLeft = Offset(strokePx / 2, strokePx / 2),
-                size = arcSize,
-                style = Stroke(width = strokePx, cap = StrokeCap.Round)
-            )
-
-            drawArc(
-                brush = Brush.horizontalGradient(listOf(OrangePrimary, OrangeSecondary)),
-                startAngle = 135f,
-                sweepAngle = 210f,
-                useCenter = false,
-                topLeft = Offset(strokePx / 2, strokePx / 2),
-                size = arcSize,
-                style = Stroke(width = strokePx, cap = StrokeCap.Round)
-            )
-        }
-
-        Column(
-            modifier = Modifier.graphicsLayer { this.alpha = expandedContentAlpha },
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = Icons.Default.LocalFireDepartment,
-                contentDescription = null,
-                tint = OrangePrimary,
-                modifier = Modifier.size(24.dp)
-            )
-            Text(
-                text = "420",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White
-            )
-            Text(
-                text = "kcal",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.6f)
-            )
-        }
-
-        Column(
-            modifier = Modifier.graphicsLayer { this.alpha = compactContentAlpha },
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "420",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White
-            )
-            Text(
-                text = "kcal",
-                fontSize = 9.sp,
-                color = Color.White.copy(alpha = 0.6f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun ActivityStatRow(
-    icon: ImageVector,
-    value: String,
-    unit: String,
-    color: Color,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(color.copy(alpha = 0.18f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Text(
-                text = unit,
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.6f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun CompactActivityStat(
-    icon: ImageVector,
-    value: String,
-    label: String,
-    color: Color,
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(16.dp)
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            maxLines = 1
-        )
-        Text(
-            text = label,
-            fontSize = 10.sp,
-            color = Color.White.copy(alpha = 0.6f),
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
-private fun GlassFeaturedWorkoutCard(
-    onStartWorkout: () -> Unit = {},
-) {
-    GlassContainer(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp)
+        shape = RoundedCornerShape(24.dp),
+        color = CardBackground,
+        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor)
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Canvas(modifier = Modifier.matchParentSize()) {
-                drawRect(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(OrangePrimary.copy(alpha = 0.15f), Color.Transparent)
-                    )
-                )
-            }
-
-            Column(
-                modifier = Modifier.padding(22.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Circular Ring Gauge
+            Box(
+                modifier = Modifier.size(76.dp), contentAlignment = Alignment.Center
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        color = OrangePrimary,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = "TODAY'S WORKOUT",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
-
-                    Text(
-                        text = "15 Mins • Intermediate",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.7f)
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val strokeWidth = 8.dp.toPx()
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.1f), style = Stroke(width = strokeWidth)
+                    )
+                    drawArc(
+                        brush = Brush.sweepGradient(
+                            listOf(CyanAccent, GreenAccent, CyanAccent)
+                        ),
+                        startAngle = -90f,
+                        sweepAngle = 360f * (progressPercent / 100f),
+                        useCenter = false,
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                     )
                 }
-
                 Text(
-                    text = "💪 Lower Body & Squat Blitz",
-                    style = MaterialTheme.typography.titleLarge,
+                    text = "$progressPercent%",
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.White
                 )
+            }
 
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "High-energy AI pose tracking challenge to build core strength and leg endurance.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.8f)
+                    text = "Weekly Goal",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMuted
                 )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "$completedWorkouts / $targetWorkouts Workouts",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
+            }
 
-                Button(
-                    onClick = onStartWorkout,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = OrangePrimary
-                    )
+            Button(
+                onClick = onViewDetails,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "Start Workout Now",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
+                    Text(
+                        text = "View Details",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
                 }
             }
         }
@@ -1533,155 +483,258 @@ private fun GlassFeaturedWorkoutCard(
 }
 
 @Composable
-private fun GlassQuickActionCard(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    gradientColors: List<Color>,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit = {},
+private fun QuickActionsGrid(
+    onStartWorkout: () -> Unit,
+    onAiCoach: () -> Unit,
+    onNutrition: () -> Unit,
+    onFitnessGames: () -> Unit,
+    onCalculators: () -> Unit,
+    onChatbot: () -> Unit,
 ) {
-    GlassContainer(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(24.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ActionGridItem(
+                icon = Icons.Default.PlayArrow,
+                label = "Start Workout",
+                iconColor = GreenAccent,
+                onClick = onStartWorkout,
+                modifier = Modifier.weight(1f)
+            )
+            ActionGridItem(
+                icon = Icons.Default.SmartToy,
+                label = "AI Coach",
+                iconColor = OrangePrimary,
+                onClick = onAiCoach,
+                modifier = Modifier.weight(1f)
+            )
+            ActionGridItem(
+                icon = Icons.Default.Fastfood,
+                label = "Nutrition",
+                iconColor = OrangeSecondary,
+                onClick = onNutrition,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ActionGridItem(
+                icon = Icons.Default.Gamepad,
+                label = "Fitness Games",
+                iconColor = BlueAccent,
+                onClick = onFitnessGames,
+                modifier = Modifier.weight(1f)
+            )
+            ActionGridItem(
+                icon = Icons.Default.Calculate,
+                label = "Calculators",
+                iconColor = CyanAccent,
+                onClick = onCalculators,
+                modifier = Modifier.weight(1f)
+            )
+            ActionGridItem(
+                icon = Icons.AutoMirrored.Filled.Chat,
+                label = "Chatbot",
+                iconColor = GreenAccent,
+                onClick = onChatbot,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActionGridItem(
+    icon: ImageVector,
+    label: String,
+    iconColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = CardBackground,
+        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor),
+        modifier = modifier.height(95.dp)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Brush.linearGradient(gradientColors)),
-                contentAlignment = Alignment.Center
+                modifier = Modifier.size(36.dp).clip(CircleShape)
+                    .background(iconColor.copy(alpha = 0.2f)), contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
-                    contentDescription = title,
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
+                    contentDescription = label,
+                    tint = iconColor,
+                    modifier = Modifier.size(20.dp)
                 )
             }
-
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.6f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun GlassMuscleRecoveryCard(
-    onOpenHeatmap: () -> Unit,
-) {
-    GlassContainer(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onOpenHeatmap),
-        shape = RoundedCornerShape(28.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(OrangePrimary.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.AccessibilityNew,
-                            contentDescription = null,
-                            tint = OrangeSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "MUSCLE RECOVERY HEATMAP",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = OrangePrimary,
-                            letterSpacing = 1.sp,
-                            maxLines = 1
-                        )
-                        Text(
-                            text = "Chest & Triceps Strained 🔥",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White,
-                            maxLines = 1
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
-            }
-
-            val recoveryItems = remember {
-                listOf(
-                    Triple("Chest", "High Strain", OrangePrimary),
-                    Triple("Triceps", "High Strain", OrangePrimary),
-                    Triple("Quads", "Fresh", Color(0xFF4CAF50))
-                )
-            }
-
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 2.dp)
-            ) {
-                items(recoveryItems, key = { it.first }) { item ->
-                    MuscleRecoveryPill(item.first, item.second, item.third)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MuscleRecoveryPill(muscle: String, status: String, color: Color) {
-    Surface(
-        color = color.copy(alpha = 0.2f),
-        shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.5f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(color))
-            Text(
-                text = "$muscle ($status)",
+                text = label,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun YourProgressSection(
+    activity: com.muscleplay.app.core.network.dto.ActivitySummaryResponseDto?,
+    workoutAnalytics: com.muscleplay.app.core.network.dto.WorkoutAnalyticsOverviewResponse?,
+    onSeeAll: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionHeader(title = "Your Progress", onSeeAll = onSeeAll)
+
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = CardBackground,
+            border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Line Chart (Left 65%)
+                Box(
+                    modifier = Modifier.weight(1.8f).height(140.dp)
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val w = size.width
+                        val h = size.height
+                        val points = listOf(
+                            Offset(0f, h * 0.7f),
+                            Offset(w * 0.16f, h * 0.55f),
+                            Offset(w * 0.33f, h * 0.4f),
+                            Offset(w * 0.50f, h * 0.6f),
+                            Offset(w * 0.66f, h * 0.5f),
+                            Offset(w * 0.83f, h * 0.25f),
+                            Offset(w, h * 0.35f)
+                        )
+
+                        val path = Path().apply {
+                            moveTo(points[0].x, points[0].y)
+                            for (i in 1 until points.size) {
+                                val p0 = points[i - 1]
+                                val p1 = points[i]
+                                cubicTo(
+                                    (p0.x + p1.x) / 2, p0.y, (p0.x + p1.x) / 2, p1.y, p1.x, p1.y
+                                )
+                            }
+                        }
+
+                        drawPath(
+                            path = path, brush = Brush.horizontalGradient(
+                                listOf(
+                                    OrangePrimary, OrangeSecondary
+                                )
+                            ), style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                        )
+
+                        // Glowing dots
+                        points.forEach { pt ->
+                            drawCircle(color = OrangePrimary, radius = 5.dp.toPx(), center = pt)
+                            drawCircle(color = Color.White, radius = 2.dp.toPx(), center = pt)
+                        }
+                    }
+
+                    // Days Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun").forEach { day ->
+                            Text(
+                                text = day,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextMuted,
+                                fontSize = 9.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Stats Stack (Right 35%)
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    val workoutsCount = workoutAnalytics?.totalWorkouts ?: 12L
+                    val calories = activity?.caloriesBurned?.toInt() ?: 2800
+                    val totalDurationSec = workoutAnalytics?.totalDurationSeconds ?: 23400L
+                    val durationHoursStr = "${totalDurationSec / 3600}h"
+
+                    ProgressStatItem(
+                        icon = Icons.Default.FitnessCenter,
+                        value = "$workoutsCount",
+                        label = "Workouts",
+                        iconColor = OrangePrimary
+                    )
+                    ProgressStatItem(
+                        icon = Icons.Default.LocalFireDepartment,
+                        value = if (calories >= 1000) "${calories / 1000}k" else "$calories",
+                        label = "Calories",
+                        iconColor = OrangeSecondary
+                    )
+                    ProgressStatItem(
+                        icon = Icons.Default.Timer,
+                        value = durationHoursStr,
+                        label = "Total Time",
+                        iconColor = BlueAccent
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgressStatItem(
+    icon: ImageVector,
+    value: String,
+    label: String,
+    iconColor: Color,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(30.dp).clip(CircleShape)
+                .background(iconColor.copy(alpha = 0.2f)), contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = iconColor,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        Column {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = TextMuted,
                 fontSize = 10.sp
             )
         }
@@ -1689,57 +742,379 @@ private fun MuscleRecoveryPill(muscle: String, status: String, color: Color) {
 }
 
 @Composable
-private fun GlassMotivationalCard() {
-    GlassContainer(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+private fun PersonalRecordsSection(onSeeAll: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionHeader(
+            title = "Personal Records", onSeeAll = onSeeAll, icon = Icons.Default.EmojiEvents
+        )
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp)
         ) {
+            item {
+                RecordItemCard("Max Weight", "100 kg", Icons.Default.FitnessCenter)
+            }
+            item {
+                RecordItemCard("Max Reps", "15 reps", Icons.Default.Refresh)
+            }
+            item {
+                RecordItemCard("Best Duration", "1h 20m", Icons.Default.Schedule)
+            }
+            item {
+                RecordItemCard("1RM Estimate", "120 kg", Icons.Default.Analytics)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecordItemCard(
+    label: String,
+    value: String,
+    icon: ImageVector,
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = CardBackground,
+        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor),
+        modifier = Modifier.width(110.dp).height(88.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Box(
+                modifier = Modifier.size(28.dp).clip(CircleShape)
+                    .background(OrangePrimary.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = OrangePrimary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
             Text(
-                text = "⚡ Fuel your fire. One rep at a time.",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = OrangeSecondary
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = TextMuted,
+                fontSize = 10.sp
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
             )
         }
     }
 }
 
 @Composable
-fun GlassContainer(
+private fun TodaysChallengeCard(
+    recommendedWorkout: com.muscleplay.app.core.network.dto.DashboardResponseDto.WorkoutRecommendation?,
+    onStart: () -> Unit,
     modifier: Modifier = Modifier,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(24.dp),
-    content: @Composable () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(22.dp),
+        color = CardBackground,
+        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor),
+        modifier = modifier.height(135.dp)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(
+                Brush.linearGradient(
+                    listOf(OrangePrimary.copy(alpha = 0.35f), CardBackground)
+                )
+            ).padding(14.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "Today's Challenge",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = OrangeSecondary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = recommendedWorkout?.name ?: "Complete 5 sets of squats",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 2
+                    )
+                }
+
+                Button(
+                    onClick = onStart,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text(
+                        text = "Start ->",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun YourNutritionCard(
+    nutrition: com.muscleplay.app.core.network.dto.DailyNutritionSummaryResponse?,
+    onNutritionClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val consumed = nutrition?.consumed?.calories?.toInt() ?: 1850
+    val target = nutrition?.target?.dailyCalories?.toInt() ?: 2500
+
+    Surface(
+        onClick = onNutritionClick,
+        shape = RoundedCornerShape(22.dp),
+        color = CardBackground,
+        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor),
+        modifier = modifier.height(135.dp)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(
+                Brush.linearGradient(
+                    listOf(GreenAccent.copy(alpha = 0.15f), CardBackground)
+                )
+            ).padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f), verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            text = "Your Nutrition",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted
+                        )
+                        Surface(
+                            color = GreenAccent.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "On Track!",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = GreenAccent,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "$consumed / $target kcal",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                Box(
+                    modifier = Modifier.size(54.dp), contentAlignment = Alignment.Center
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.1f), style = Stroke(6.dp.toPx())
+                        )
+                        drawArc(
+                            color = GreenAccent,
+                            startAngle = -90f,
+                            sweepAngle = 260f,
+                            useCenter = false,
+                            style = Stroke(6.dp.toPx(), cap = StrokeCap.Round)
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.Fastfood,
+                        contentDescription = null,
+                        tint = OrangeSecondary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(
+    title: String,
+    onSeeAll: () -> Unit,
+    icon: ImageVector? = null,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            icon?.let {
+                Icon(
+                    imageVector = it,
+                    contentDescription = null,
+                    tint = OrangePrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
+            )
+        }
+        TextButton(onClick = onSeeAll) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "See All",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = OrangePrimary
+                )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    tint = OrangePrimary,
+                    modifier = Modifier.size(12.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DashboardLoadingSkeleton(modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f, targetValue = 0.6f, animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing), repeatMode = RepeatMode.Reverse
+        ), label = "alpha"
+    )
+
+    Column(
+        modifier = modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxWidth(0.5f).height(30.dp).clip(RoundedCornerShape(8.dp))
+                .background(Color.White.copy(alpha = alpha))
+        )
+        Box(
+            modifier = Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(24.dp))
+                .background(Color.White.copy(alpha = alpha))
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            repeat(3) {
+                Box(
+                    modifier = Modifier.weight(1f).height(90.dp).clip(RoundedCornerShape(18.dp))
+                        .background(Color.White.copy(alpha = alpha))
+                )
+            }
+        }
+        Box(
+            modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(24.dp))
+                .background(Color.White.copy(alpha = alpha))
+        )
+    }
+}
+
+@Composable
+private fun DashboardErrorScreen(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier
-            .clip(shape)
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.12f),
-                        Color.White.copy(alpha = 0.04f)
-                    )
-                )
-            )
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.35f),
-                        OrangePrimary.copy(alpha = 0.25f),
-                        Color.White.copy(alpha = 0.08f)
-                    )
-                ),
-                shape = shape
-            )
+        modifier = modifier, contentAlignment = Alignment.Center
     ) {
-        content()
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(24.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = null,
+                tint = OrangePrimary,
+                modifier = Modifier.size(48.dp)
+            )
+            Text(
+                text = "Oops! Something went wrong",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Text(
+                text = message, style = MaterialTheme.typography.bodyMedium, color = TextMuted
+            )
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text("Retry", fontWeight = FontWeight.Bold)
+            }
+        }
     }
+}
+
+private fun createSampleDashboardDto(): DashboardResponseDto {
+    return DashboardResponseDto(
+        user = DashboardResponseDto.UserSummary(
+            userId = "1", email = "alex@muscleplay.com", name = "Alex", profileCompleted = true
+        ),
+        activity = com.muscleplay.app.core.network.dto.ActivitySummaryResponseDto(
+            activeMinutes = 45,
+            caloriesBurned = 2800.0,
+            completedActivities = 4,
+            dailyGoalMinutes = 60,
+            goalProgressPercent = 78
+        ),
+        nutrition = com.muscleplay.app.core.network.dto.DailyNutritionSummaryResponse(
+            target = com.muscleplay.app.core.network.dto.NutritionGoalResponse(
+                dailyCalories = 2500.0
+            ),
+            consumed = com.muscleplay.app.core.network.dto.DailyNutritionSummaryResponse.NutrientTotals(
+                calories = 1850.0
+            ),
+            calorieProgressPercent = 74.0
+        ),
+        workoutAnalytics = com.muscleplay.app.core.network.dto.WorkoutAnalyticsOverviewResponse(
+            totalWorkouts = 12, totalDurationSeconds = 23400, activeDays = 5
+        ),
+        wallet = DashboardResponseDto.WalletSummary(balanceCoins = 1250),
+        notifications = DashboardResponseDto.NotificationSummary(unreadCount = 2),
+        recommendedWorkout = DashboardResponseDto.WorkoutRecommendation(
+            name = "Complete 5 sets of squats", difficulty = "INTERMEDIATE"
+        )
+    )
 }

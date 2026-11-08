@@ -9,12 +9,26 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MusclePlayFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         latestFcmToken = token
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val app = applicationContext as? android.app.Application
+                if (app != null) {
+                    val container = com.muscleplay.app.core.di.AppContainer()
+                    container.notificationRepository.registerCurrentDevice(fcmToken = token, force = true)
+                }
+            } catch (e: Throwable) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+            }
+        }
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -42,7 +56,8 @@ class MusclePlayFirebaseMessagingService : FirebaseMessagingService() {
             notificationManager.createNotificationChannel(channel)
         }
 
-        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return
+        launchIntent.apply {
             putExtra("targetRoute", targetRoute)
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }

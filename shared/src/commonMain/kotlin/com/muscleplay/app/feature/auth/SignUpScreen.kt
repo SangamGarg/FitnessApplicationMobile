@@ -41,7 +41,8 @@ private val DarkBackground = Color(0xFF0F0F17)
 
 @Composable
 fun SignUpScreen(
-    onNavigateToOtp: (email: String, password: String) -> Unit = { _, _ -> },
+    authRepository: AuthRepository? = null,
+    onNavigateToOtp: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
 ) {
     val email = remember { FieldState() }
@@ -81,7 +82,8 @@ fun SignUpScreen(
         if (hasErrors) {
             snackbarMessage = "Please fix the highlighted fields."
         } else {
-            onNavigateToOtp(email.text, password.text)
+            authRepository?.setPendingSignUpData(email.text, password.text)
+            onNavigateToOtp()
         }
     }
 
