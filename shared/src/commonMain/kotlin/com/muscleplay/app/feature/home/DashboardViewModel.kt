@@ -17,10 +17,12 @@ sealed interface DashboardUiState {
         val data: DashboardResponseDto,
         val isRefreshing: Boolean = false,
     ) : DashboardUiState
+
     data class Error(
         val statusCode: Int,
         val message: String,
     ) : DashboardUiState
+
     data object Empty : DashboardUiState
 }
 
@@ -60,7 +62,10 @@ class DashboardViewModel(
                 }
 
                 is NetworkResult.Error -> {
-                    _uiState.value = DashboardUiState.Error(result.statusCode, result.message)
+                    _uiState.value = DashboardUiState.Error(
+                        result.statusCode, "Please Try Again"
+                        //     result.message
+                    )
                 }
 
                 is NetworkResult.Exception -> {

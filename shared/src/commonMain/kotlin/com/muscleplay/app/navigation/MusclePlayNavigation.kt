@@ -388,6 +388,7 @@ fun MusclePlayNavigation(
                     authRepository = appContainer.authRepository,
                     dashboardRepository = appContainer.dashboardRepository,
                     userSessionRepository = appContainer.userSessionRepository,
+                    profileRepository = appContainer.profileRepository,
                     onNavigateToSettings = { navController.navigate(Routes.PROFILE_SETTINGS) },
                     onNavigateToHelp = { navController.navigate(Routes.PROFILE_HELP) },
                     onNavigateToDiagnostics = { navController.navigate(Routes.PROFILE_DIAGNOSTICS) },
@@ -421,20 +422,23 @@ fun MusclePlayNavigation(
                     })
             }
             composable(Routes.PROFILE_HELP) {
-                HelpSupportScreen(onBack = {
-                    navController.popBackStack()
-                }, onNavigateToAiBot = {
-                    navController.navigate(Routes.PROFILE_AI_BOT)
-                }, onNavigateToEmailSupport = {
-                    navController.navigate(Routes.PROFILE_EMAIL_SUPPORT)
-                }, onNavigateToRaiseTicket = {
-                    navController.navigate(Routes.PROFILE_RAISE_TICKET)
-                }, onNavigateToMyTickets = {
-                    navController.navigate(Routes.PROFILE_MY_TICKETS)
-                })
+                HelpSupportScreen(
+                    supportRepository = appContainer.supportRepository,
+                    onBack = {
+                        navController.popBackStack()
+                    }, onNavigateToAiBot = {
+                        navController.navigate(Routes.PROFILE_AI_BOT)
+                    }, onNavigateToEmailSupport = {
+                        navController.navigate(Routes.PROFILE_EMAIL_SUPPORT)
+                    }, onNavigateToRaiseTicket = {
+                        navController.navigate(Routes.PROFILE_RAISE_TICKET)
+                    }, onNavigateToMyTickets = {
+                        navController.navigate(Routes.PROFILE_MY_TICKETS)
+                    })
             }
             composable(Routes.PROFILE_EMAIL_SUPPORT) {
                 EmailSupportScreen(
+                    emailSupportRepository = appContainer.emailSupportRepository,
                     onBack = {
                         navController.popBackStack()
                     })
@@ -465,19 +469,23 @@ fun MusclePlayNavigation(
                 )
             }
             composable(Routes.PROFILE_RAISE_TICKET) {
-                RaiseTicketScreen(onBack = {
-                    navController.popBackStack()
-                }, onViewTickets = {
-                    navController.popBackStack()
-                    navController.navigate(Routes.PROFILE_MY_TICKETS)
-                })
+                RaiseTicketScreen(
+                    ticketRepository = appContainer.ticketRepository,
+                    onBack = {
+                        navController.popBackStack()
+                    }, onViewTickets = {
+                        navController.popBackStack()
+                        navController.navigate(Routes.PROFILE_MY_TICKETS)
+                    })
             }
             composable(Routes.PROFILE_MY_TICKETS) {
-                MyTicketsScreen(onBack = {
-                    navController.popBackStack()
-                }, onRaiseTicket = {
-                    navController.navigate(Routes.PROFILE_RAISE_TICKET)
-                })
+                MyTicketsScreen(
+                    ticketRepository = appContainer.ticketRepository,
+                    onBack = {
+                        navController.popBackStack()
+                    }, onRaiseTicket = {
+                        navController.navigate(Routes.PROFILE_RAISE_TICKET)
+                    })
             }
             composable(Routes.REP_CHALLENGE_ROUTE) {
                 RepChallengeScreen(

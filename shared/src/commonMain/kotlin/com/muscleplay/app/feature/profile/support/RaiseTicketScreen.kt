@@ -1,18 +1,72 @@
 package com.muscleplay.app.feature.profile.support
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PermDeviceInformation
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,50 +75,31 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.random.Random
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 private val OrangePrimary = Color(0xFFFF5722)
 private val OrangeSecondary = Color(0xFFFF9800)
 private val DarkBackground = Color(0xFF0F0F17)
+private val TextMuted = Color(0xFF9E9B9E)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RaiseTicketScreen(
+    ticketRepository: com.muscleplay.app.feature.profile.support.data.TicketRepository? = null,
     onBack: () -> Unit,
-    onViewTickets: () -> Unit = {}
+    onViewTickets: () -> Unit = {},
 ) {
-    val categories = listOf(
-        "Pose Tracking & Rep Counting",
-        "Account & Subscription",
-        "Workout Analytics & Progress",
-        "App Crash / Performance Bug",
-        "Category Not Present / Other"
-    )
-
-    val subCategoriesMap = mapOf(
-        "Pose Tracking & Rep Counting" to listOf("Inaccurate Rep Count", "Camera Frame Freezing", "Liveness Challenge Issue"),
-        "Account & Subscription" to listOf("Pro Subscription Upgrade", "Payment Failure", "Cancel Subscription"),
-        "Workout Analytics & Progress" to listOf("Missing Workout Log", "Streak Count Error", "Progress Photo Sync"),
-        "App Crash / Performance Bug" to listOf("Screen Freeze", "App Crashes on Launch", "Audio Cue Delay"),
-        "Category Not Present / Other" to listOf("General Feedback", "Custom Feature Request", "Other Issue")
-    )
-
-    var selectedCategory by remember { mutableStateOf(categories[0]) }
-    var selectedSubCategory by remember { mutableStateOf(subCategoriesMap[categories[0]]!![0]) }
-    var customCategoryText by remember { mutableStateOf("") }
-    var subjectText by remember { mutableStateOf("") }
-    var descriptionText by remember { mutableStateOf("") }
-    var attachmentName by remember { mutableStateOf<String?>(null) }
-
+    val viewModel = remember(ticketRepository) { RaiseTicketViewModel(ticketRepository) }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var isCategoryExpanded by remember { mutableStateOf(false) }
-    var isSubCategoryExpanded by remember { mutableStateOf(false) }
-    var showAttachmentDialog by remember { mutableStateOf(false) }
-    var showSuccessDialog by remember { mutableStateOf(false) }
-    var submittedTicketId by remember { mutableStateOf("") }
-
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val isCategoryNotPresent = selectedCategory == "Category Not Present / Other"
+    val openAttachmentPicker = rememberAttachmentPicker(
+        allowedMimeTypes = uiState.validation.allowedMimeTypes,
+        onAttachmentsPicked = { attachments ->
+            viewModel.addAttachments(attachments)
+        }
+    )
 
     Box(
         modifier = Modifier
@@ -76,15 +111,13 @@ fun RaiseTicketScreen(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
-                    title = { Text("Raise Support Ticket", fontWeight = FontWeight.Bold, color = Color.White) },
+                    title = { Text(uiState.homeTitle, fontWeight = FontWeight.Bold, color = Color.White) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent
-                    )
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
                 )
             }
         ) { innerPadding ->
@@ -96,28 +129,84 @@ fun RaiseTicketScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 contentPadding = PaddingValues(bottom = 32.dp)
             ) {
+                // Header description or Shimmer
                 item {
-                    Text(
-                        text = "Describe Your Issue",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = OrangeSecondary
-                    )
-                    Text(
-                        text = "Select a category and attach media so our team can resolve your issue quickly.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.7f)
-                    )
+                    if (uiState.isLoadingHome) {
+                        ShimmerRaiseHeader()
+                    } else {
+                        Column {
+                            Text(
+                                text = uiState.homeSubtitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = OrangeSecondary
+                            )
+                            Text(
+                                text = uiState.homeDescription,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
                 }
 
-                // Category Selector
+                // Error Banner if present
+                uiState.errorMessage?.let { errorMsg ->
+                    item {
+                        Surface(
+                            color = OrangePrimary.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                OrangePrimary.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = errorMsg,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.White,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedButton(
+                                    onClick = { viewModel.loadTicketsHome() },
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        OrangePrimary
+                                    ),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangePrimary),
+                                    contentPadding = PaddingValues(
+                                        horizontal = 10.dp,
+                                        vertical = 4.dp
+                                    )
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Retry", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Category Selector (Single Category)
                 item {
                     ExposedDropdownMenuBox(
                         expanded = isCategoryExpanded,
                         onExpandedChange = { isCategoryExpanded = !isCategoryExpanded }
                     ) {
                         OutlinedTextField(
-                            value = selectedCategory,
+                            value = uiState.selectedCategoryLabel.ifBlank { "Select Category" },
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Category", color = OrangePrimary) },
@@ -126,25 +215,18 @@ fun RaiseTicketScreen(
                                 .fillMaxWidth()
                                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true),
                             shape = RoundedCornerShape(16.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = OrangePrimary,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
-                            )
+                            colors = inputColors()
                         )
                         ExposedDropdownMenu(
                             expanded = isCategoryExpanded,
                             onDismissRequest = { isCategoryExpanded = false },
                             modifier = Modifier.background(Color(0xFF181824))
                         ) {
-                            categories.forEach { cat ->
+                            uiState.categories.forEach { cat ->
                                 DropdownMenuItem(
-                                    text = { Text(cat, color = Color.White) },
+                                    text = { Text(cat.label, color = Color.White) },
                                     onClick = {
-                                        selectedCategory = cat
-                                        val subList = subCategoriesMap[cat] ?: listOf("Other Issue")
-                                        selectedSubCategory = subList[0]
+                                        viewModel.selectCategory(cat.key)
                                         isCategoryExpanded = false
                                     }
                                 )
@@ -153,327 +235,336 @@ fun RaiseTicketScreen(
                     }
                 }
 
-                // Custom Category Text Field (if Category Not Present)
-                if (isCategoryNotPresent) {
-                    item {
+                // Subject Field
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Subject", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(
+                                "${uiState.subject.length} / ${uiState.validation.subjectMaxLength}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (uiState.isSubjectValid) Color.White.copy(alpha = 0.5f) else OrangePrimary
+                            )
+                        }
+
                         OutlinedTextField(
-                            value = customCategoryText,
-                            onValueChange = { customCategoryText = it },
-                            label = { Text("Specify Custom Category / Topic", color = OrangePrimary) },
-                            placeholder = { Text("e.g. Heart Rate Monitor Sync", color = Color.White.copy(alpha = 0.4f)) },
+                            value = uiState.subject,
+                            onValueChange = { viewModel.updateSubject(it) },
+                            placeholder = { Text("Short title for your support request...", color = Color.White.copy(alpha = 0.4f)) },
+                            trailingIcon = {
+                                if (uiState.subject.isNotEmpty()) {
+                                    IconButton(onClick = { viewModel.updateSubject("") }) {
+                                        Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color.White.copy(alpha = 0.5f))
+                                    }
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = OrangePrimary,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
-                            ),
-                            singleLine = true
+                            singleLine = true,
+                            colors = inputColors()
                         )
                     }
                 }
 
-                // Sub-Category Selector
+                // Description Area
                 item {
-                    val currentSubList = subCategoriesMap[selectedCategory] ?: listOf("Other Issue")
-                    ExposedDropdownMenuBox(
-                        expanded = isSubCategoryExpanded,
-                        onExpandedChange = { isSubCategoryExpanded = !isSubCategoryExpanded }
-                    ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Detailed Description", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(
+                                "${uiState.description.length} / ${uiState.validation.messageMaxLength}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (uiState.isDescriptionValid) Color.White.copy(alpha = 0.5f) else OrangePrimary
+                            )
+                        }
+
                         OutlinedTextField(
-                            value = selectedSubCategory,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Sub-Category", color = OrangePrimary) },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isSubCategoryExpanded) },
+                            value = uiState.description,
+                            onValueChange = { viewModel.updateDescription(it) },
+                            placeholder = { Text("Provide details, steps to reproduce, or relevant info...", color = Color.White.copy(alpha = 0.4f)) },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = OrangePrimary,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
-                            )
+                                .height(160.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = inputColors()
                         )
-                        ExposedDropdownMenu(
-                            expanded = isSubCategoryExpanded,
-                            onDismissRequest = { isSubCategoryExpanded = false },
-                            modifier = Modifier.background(Color(0xFF181824))
+                    }
+                }
+
+                // Attachments Section
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Allowed types: JPG, JPEG, PNG, WEBP • Max file size: 5 MB • Max total: 10 MB",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            currentSubList.forEach { subCat ->
-                                DropdownMenuItem(
-                                    text = { Text(subCat, color = Color.White) },
-                                    onClick = {
-                                        selectedSubCategory = subCat
-                                        isSubCategoryExpanded = false
+                            Text(
+                                "Attachments (${uiState.attachments.size}/${uiState.validation.maxAttachments})",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+
+                            Button(
+                                onClick = { openAttachmentPicker() },
+                                enabled = uiState.attachments.size < uiState.validation.maxAttachments,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary.copy(alpha = 0.25f))
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Default.AttachFile, contentDescription = "Attach", tint = OrangeSecondary, modifier = Modifier.size(18.dp))
+                                    Text("Add File", fontWeight = FontWeight.Bold, color = OrangeSecondary, fontSize = 12.sp)
+                                }
+                            }
+                        }
+
+                        if (uiState.attachments.isNotEmpty()) {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                itemsIndexed(uiState.attachments) { index, att ->
+                                    Surface(
+                                        color = Color.White.copy(alpha = 0.08f),
+                                        shape = RoundedCornerShape(12.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.4f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(Icons.Default.Image, contentDescription = null, tint = OrangeSecondary, modifier = Modifier.size(16.dp))
+                                            Text(
+                                                "${att.name} (${formatFileSize(att.sizeBytes)})",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color.White
+                                            )
+                                            IconButton(
+                                                onClick = { viewModel.removeAttachment(index) },
+                                                modifier = Modifier.size(18.dp)
+                                            ) {
+                                                Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.Red, modifier = Modifier.size(14.dp))
+                                            }
+                                        }
                                     }
-                                )
+                                }
                             }
                         }
                     }
                 }
 
-                // Subject Text Field
+                // Auto-attached Diagnostics Info
                 item {
-                    OutlinedTextField(
-                        value = subjectText,
-                        onValueChange = { subjectText = it },
-                        label = { Text("Subject", color = OrangePrimary) },
-                        placeholder = { Text("Brief summary of the problem", color = Color.White.copy(alpha = 0.4f)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = OrangePrimary,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
-                        ),
-                        singleLine = true
-                    )
-                }
-
-                // Description Text Field
-                item {
-                    OutlinedTextField(
-                        value = descriptionText,
-                        onValueChange = { descriptionText = it },
-                        label = { Text("Detailed Description", color = OrangePrimary) },
-                        placeholder = { Text("Provide details, steps to reproduce...", color = Color.White.copy(alpha = 0.4f)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = OrangePrimary,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
-                        ),
-                        minLines = 4,
-                        maxLines = 6
-                    )
-                }
-
-                // Attachment Section (Photo / Video)
-                item {
-                    Text(
-                        text = "Upload Video or Image (Optional)",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    if (attachmentName != null) {
-                        GlassCardContainer {
+                    GlassCardContainer {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.AttachFile, contentDescription = null, tint = OrangePrimary)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = attachmentName!!,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color.White
-                                    )
-                                }
-                                IconButton(onClick = { attachmentName = null }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.White)
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.PermDeviceInformation, contentDescription = null, tint = OrangeSecondary, modifier = Modifier.size(20.dp))
+                                    Text("Auto-Attached Diagnostics Info", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
                                 }
                             }
-                        }
-                    } else {
-                        OutlinedButton(
-                            onClick = { showAttachmentDialog = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeSecondary)
-                        ) {
-                            Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = OrangeSecondary)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Attach Photo or Recording", fontWeight = FontWeight.Bold)
+
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                DiagnosticRow("Device Model:", uiState.deviceModel)
+                                DiagnosticRow("App Version:", uiState.appVersion)
+                            }
                         }
                     }
                 }
 
                 // Submit Button
                 item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = {
-                            val randomNum = Random.nextInt(10000, 99999)
-                            submittedTicketId = "#MP-$randomNum"
-                            showSuccessDialog = true
-                        },
-                        enabled = subjectText.isNotBlank() && descriptionText.isNotBlank(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = OrangePrimary,
-                            disabledContainerColor = Color.White.copy(alpha = 0.12f)
-                        )
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = Color.White)
-                            Text("Submit Support Ticket", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { viewModel.submitTicket() },
+                            enabled = uiState.isFormValid && !uiState.isSubmitting,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = OrangePrimary,
+                                disabledContainerColor = Color.White.copy(alpha = 0.12f)
+                            )
+                        ) {
+                            if (uiState.isSubmitting) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
+                            } else {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+                                    Text("Send Support Ticket", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                }
+                            }
+                        }
+
+                        if (!uiState.isFormValid && !uiState.isSubmitting) {
+                            Text(
+                                text = "⚠️ Please fill all required fields within valid character limits.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = OrangeSecondary,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
                         }
                     }
                 }
             }
+        }
 
-            // Glassmorphic Attachment Source Dialog
-            if (showAttachmentDialog) {
-                AlertDialog(
-                    onDismissRequest = { showAttachmentDialog = false },
-                    shape = RoundedCornerShape(28.dp),
-                    containerColor = Color(0xFF181824),
-                    icon = {
-                        Box(
-                            modifier = Modifier
-                                .size(52.dp)
-                                .clip(CircleShape)
-                                .background(OrangePrimary.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.AttachFile, contentDescription = null, tint = OrangeSecondary, modifier = Modifier.size(28.dp))
-                        }
-                    },
-                    title = { Text("Choose Attachment Source", fontWeight = FontWeight.Bold, color = Color.White) },
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Surface(
-                                onClick = {
-                                    attachmentName = "camera_capture_${Random.nextInt(1000, 9999)}.mp4"
-                                    showAttachmentDialog = false
-                                },
-                                color = Color.White.copy(alpha = 0.08f),
-                                shape = RoundedCornerShape(16.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.4f)),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = OrangeSecondary)
-                                    Text("Take Photo or Video (Live Camera)", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-                                }
-                            }
-
-                            Surface(
-                                onClick = {
-                                    attachmentName = "workout_log_screenshot.png"
-                                    showAttachmentDialog = false
-                                },
-                                color = Color.White.copy(alpha = 0.08f),
-                                shape = RoundedCornerShape(16.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Icon(Icons.Default.Collections, contentDescription = null, tint = OrangeSecondary)
-                                    Text("Choose from Gallery", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-                                }
-                            }
-                        }
-                    },
-                    confirmButton = {
-                        TextButton(onClick = { showAttachmentDialog = false }) {
-                            Text("Cancel", color = Color.White.copy(alpha = 0.6f))
-                        }
+        // Ticket Success Confirmation Dialog
+        if (uiState.ticketCreatedSuccess) {
+            AlertDialog(
+                onDismissRequest = {
+                    viewModel.dismissSuccessDialog()
+                    onBack()
+                },
+                shape = RoundedCornerShape(28.dp),
+                containerColor = Color(0xFF181824),
+                icon = {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF4CAF50).copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = "Success", tint = Color(0xFF4CAF50), modifier = Modifier.size(36.dp))
                     }
-                )
-            }
-
-            // Glassmorphic Success Dialog
-            if (showSuccessDialog) {
-                AlertDialog(
-                    onDismissRequest = { showSuccessDialog = false },
-                    shape = RoundedCornerShape(28.dp),
-                    containerColor = Color(0xFF181824),
-                    icon = {
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF4CAF50).copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(36.dp))
-                        }
-                    },
-                    title = { Text("Ticket Submitted! 📩", fontWeight = FontWeight.Bold, color = Color.White) },
-                    text = {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text("Your ticket reference number is:", color = Color.White.copy(alpha = 0.8f))
-                            Text(
-                                text = submittedTicketId,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = OrangeSecondary
-                            )
-                            Text(
-                                text = "Our support team will review your ticket and reply within 24 hours.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.6f)
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                showSuccessDialog = false
-                                onViewTickets()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
-                        ) {
-                            Text("View My Tickets", fontWeight = FontWeight.Bold)
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(
-                            onClick = {
-                                showSuccessDialog = false
-                                onBack()
-                            }
-                        ) {
-                            Text("Done", color = Color.White.copy(alpha = 0.6f))
-                        }
+                },
+                title = { Text("Ticket Submitted! 📩", fontWeight = FontWeight.Bold, color = Color.White) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Your ticket reference ${uiState.createdTicketNumber} has been created.", fontWeight = FontWeight.Bold, color = OrangeSecondary)
+                        Text("Our engineering team will review your ticket and reply within 24 hours.", color = Color.White.copy(alpha = 0.8f))
                     }
-                )
-            }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.dismissSuccessDialog()
+                            onViewTickets()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                    ) {
+                        Text("View My Tickets 🎟️", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.dismissSuccessDialog()
+                            onBack()
+                        }
+                    ) {
+                        Text("Done", color = TextMuted)
+                    }
+                }
+            )
         }
     }
 }
 
 @Composable
-private fun GlassCardContainer(content: @Composable () -> Unit) {
+private fun ShimmerRaiseHeader() {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.5f)
+                .height(18.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color.White.copy(alpha = alpha))
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .height(14.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color.White.copy(alpha = alpha))
+        )
+    }
+}
+
+private fun formatFileSize(sizeBytes: Long): String {
+    if (sizeBytes <= 0) return "0 B"
+    val kb = sizeBytes / 1024.0
+    val mb = kb / 1024.0
+    return if (mb >= 1.0) {
+        "${(mb * 10).toInt() / 10.0} MB"
+    } else {
+        "${kb.toInt()} KB"
+    }
+}
+
+@Composable
+private fun DiagnosticRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+        Text(value, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White)
+    }
+}
+
+@Composable
+private fun inputColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = Color.White,
+    unfocusedTextColor = Color.White,
+    focusedBorderColor = OrangePrimary,
+    unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
+)
+
+@Composable
+private fun GlassCardContainer(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(22.dp))
             .background(
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.12f),
-                        Color.White.copy(alpha = 0.04f)
+                        Color.White.copy(alpha = 0.10f),
+                        Color.White.copy(alpha = 0.03f)
                     )
                 )
             )
@@ -481,12 +572,11 @@ private fun GlassCardContainer(content: @Composable () -> Unit) {
                 width = 1.dp,
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.35f),
-                        OrangePrimary.copy(alpha = 0.25f),
-                        Color.White.copy(alpha = 0.08f)
+                        Color.White.copy(alpha = 0.30f),
+                        OrangePrimary.copy(alpha = 0.20f)
                     )
                 ),
-                shape = RoundedCornerShape(24.dp)
+                shape = RoundedCornerShape(22.dp)
             )
     ) {
         content()

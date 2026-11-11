@@ -9,7 +9,7 @@ data class DeviceInfo(
     val deviceId: String,
     val platform: DevicePlatform,
     val deviceName: String,
-    val appVersion: String
+    val appVersion: String?
 )
 
 expect class DeviceInstallationManager() {

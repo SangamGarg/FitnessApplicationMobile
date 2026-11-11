@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.muscleplay.app.core.network.auth.UserProfile
@@ -160,7 +161,7 @@ fun HomeScreen(
 
                 is DashboardUiState.Error -> {
                     DashboardErrorScreen(
-                        message = state.message,
+                        message = "Unable to load dashboard data right now. Please check your connection and try again.",
                         onRetry = { viewModel?.loadDashboard() },
                         modifier = Modifier.fillMaxSize().padding(innerPadding)
                     )
@@ -168,7 +169,7 @@ fun HomeScreen(
 
                 is DashboardUiState.Empty -> {
                     DashboardErrorScreen(
-                        message = "No dashboard data available.",
+                        message = "Unable to load dashboard data right now. Please check your connection and try again.",
                         onRetry = { viewModel?.loadDashboard() },
                         modifier = Modifier.fillMaxSize().padding(innerPadding)
                     )
@@ -1049,7 +1050,7 @@ private fun DashboardLoadingSkeleton(modifier: Modifier = Modifier) {
 
 @Composable
 private fun DashboardErrorScreen(
-    message: String,
+    message: String = "Unable to load dashboard data right now. Please check your connection and try again.",
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1074,7 +1075,10 @@ private fun DashboardErrorScreen(
                 color = Color.White
             )
             Text(
-                text = message, style = MaterialTheme.typography.bodyMedium, color = TextMuted
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextMuted,
+                textAlign = TextAlign.Center
             )
             Button(
                 onClick = onRetry,

@@ -8,7 +8,7 @@ data class DeviceRegisterRequestDto(
     val fcmToken: String,
     val platform: String = "ANDROID",
     val deviceName: String = "Android Device",
-    val appVersion: String = "1.0.0",
+    val appVersion: String? = "1.0.0",
     val notificationEnabled: Boolean = true,
 )
 

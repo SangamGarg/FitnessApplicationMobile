@@ -473,6 +473,10 @@ private fun ExerciseCameraContent(
                         .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
                     analysis.setAnalyzer(analysisExecutor) { imageProxy ->
+                        if (disposed) {
+                            imageProxy.close()
+                            return@setAnalyzer
+                        }
                         try {
                             val bitmap = imageProxy.toRgbaBitmap()
                             val mpImage = BitmapImageBuilder(bitmap).build()

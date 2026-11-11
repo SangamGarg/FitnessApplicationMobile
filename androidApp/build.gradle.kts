@@ -43,7 +43,8 @@ android {
             buildConfigField("String", "BASE_URL", "\"http://192.168.1.3:8080/api/v1/app\"")
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             buildConfigField("String", "BASE_URL", "\"http://192.168.1.3:8080/api/v1/app\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

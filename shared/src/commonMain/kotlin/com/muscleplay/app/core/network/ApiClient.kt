@@ -2,13 +2,24 @@ package com.muscleplay.app.core.network
 
 import com.muscleplay.app.core.network.api.AuthApiService
 import com.muscleplay.app.core.network.api.DashboardApiService
+import com.muscleplay.app.core.network.api.EmailSupportApiService
 import com.muscleplay.app.core.network.api.NotificationApiService
+import com.muscleplay.app.core.network.api.ProfileApiService
+import com.muscleplay.app.core.network.api.SupportApiService
+import com.muscleplay.app.core.network.api.TicketApiService
 import com.muscleplay.app.core.network.api.WorkoutApiService
 import com.muscleplay.app.core.network.auth.TokenStorageManager
 import com.muscleplay.app.core.network.client.HttpClientFactory
+import com.muscleplay.app.core.network.dto.AppInfoContentResponseDto
 import com.muscleplay.app.core.network.dto.AuthResponseDto
+import com.muscleplay.app.core.network.dto.CreateSupportTicketRequestDTO
 import com.muscleplay.app.core.network.dto.DashboardResponseDto
 import com.muscleplay.app.core.network.dto.DeviceRegisterRequestDto
+import com.muscleplay.app.core.network.dto.EmailFromUserRequestDto
+import com.muscleplay.app.core.network.dto.EmailFromUserResponseDto
+import com.muscleplay.app.core.network.dto.FeedbackRequestDto
+import com.muscleplay.app.core.network.dto.FeedbackResponseDto
+import com.muscleplay.app.core.network.dto.FollowUsLinkDto
 import com.muscleplay.app.core.network.dto.NotificationHistoryResponseDto
 import com.muscleplay.app.core.network.dto.NotificationPreferenceRequestDto
 import com.muscleplay.app.core.network.dto.OtpActionResponseDto
@@ -18,6 +29,13 @@ import com.muscleplay.app.core.network.dto.RefreshTokenResponseDto
 import com.muscleplay.app.core.network.dto.ResetPasswordWithOtpRequestDto
 import com.muscleplay.app.core.network.dto.SignInRequestDto
 import com.muscleplay.app.core.network.dto.SignUpRequestDto
+import com.muscleplay.app.core.network.dto.SupportAttachment
+import com.muscleplay.app.core.network.dto.SupportEmailHomeResponseDto
+import com.muscleplay.app.core.network.dto.SupportFaqPageDto
+import com.muscleplay.app.core.network.dto.SupportHomeResponseDto
+import com.muscleplay.app.core.network.dto.SupportTicketHomeResponseDto
+import com.muscleplay.app.core.network.dto.SupportTicketMessageResponseDTO
+import com.muscleplay.app.core.network.dto.SupportTicketResponseDTO
 import com.muscleplay.app.core.network.dto.SyncWorkoutRequestDto
 import com.muscleplay.app.core.network.dto.UnreadCountResponseDto
 import com.muscleplay.app.core.network.dto.UserDetailsDto
@@ -29,11 +47,16 @@ import com.muscleplay.app.core.network.dto.VerifyEmailOtpRequestDto
 import com.muscleplay.app.core.network.dto.WorkoutLogDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
 import io.ktor.client.request.header
+import io.ktor.client.request.post
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
@@ -53,7 +76,7 @@ class ApiClient(
     val baseUrl: String = getPlatformBaseUrl(),
     private val ktorClient: HttpClient = HttpClientFactory.create(),
     var tokenStorageManager: TokenStorageManager? = null,
-) : AuthApiService, WorkoutApiService, NotificationApiService, DashboardApiService {
+) : AuthApiService, WorkoutApiService, NotificationApiService, DashboardApiService, ProfileApiService, SupportApiService, EmailSupportApiService, TicketApiService {
 
     override suspend fun sendSignupOtp(email: String): NetworkResult<OtpActionResponseDto> {
         return executeKtorRequest(
@@ -328,6 +351,232 @@ class ApiClient(
             httpMethod = HttpMethod.Get,
             headers = authHeader
         )
+    }
+
+    override suspend fun submitFeedback(
+        accessToken: String,
+        request: FeedbackRequestDto,
+    ): NetworkResult<FeedbackResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/feedback/submit",
+            httpMethod = HttpMethod.Post,
+            headers = authHeader,
+            bodyObj = request
+        )
+    }
+
+    override suspend fun fetchFollowUsLinks(accessToken: String): NetworkResult<List<FollowUsLinkDto>> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/follow-us/links",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun fetchSupportHome(accessToken: String): NetworkResult<SupportHomeResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/support/home",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun fetchAboutInfo(accessToken: String): NetworkResult<AppInfoContentResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/support/about",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun fetchPrivacyPolicy(accessToken: String): NetworkResult<AppInfoContentResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/support/privacy-policy",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun fetchTermsConditions(accessToken: String): NetworkResult<AppInfoContentResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/support/terms-condition",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun searchFaqs(
+        accessToken: String,
+        categoryKey: String?,
+        query: String?,
+        page: Int,
+        size: Int,
+    ): NetworkResult<SupportFaqPageDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        val queryParams = mutableListOf<String>()
+        if (!categoryKey.isNullOrBlank()) queryParams.add("categoryKey=$categoryKey")
+        if (!query.isNullOrBlank()) queryParams.add("query=$query")
+        queryParams.add("page=$page")
+        queryParams.add("size=$size")
+        val queryString = queryParams.joinToString("&")
+        return executeKtorRequest(
+            url = "$baseUrl/support/faq?$queryString",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun fetchEmailSupportHome(accessToken: String): NetworkResult<SupportEmailHomeResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/support/email/home",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun sendSupportEmail(
+        accessToken: String,
+        requestDto: EmailFromUserRequestDto,
+        attachments: List<SupportAttachment>,
+    ): NetworkResult<EmailFromUserResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        val requestJson = jsonParser.encodeToString(EmailFromUserRequestDto.serializer(), requestDto)
+
+        return try {
+            val response = ktorClient.post("$baseUrl/support/email/send") {
+                authHeader.forEach { (key, value) -> header(key, value) }
+                setBody(
+                    MultiPartFormDataContent(
+                        formData {
+                            append("request", requestJson, Headers.build {
+                                append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                            })
+                            attachments.forEach { att ->
+                                if (att.bytes != null) {
+                                    append("attachments", att.bytes, Headers.build {
+                                        append(HttpHeaders.ContentDisposition, "filename=\"${att.name}\"")
+                                        append(HttpHeaders.ContentType, att.mimeType)
+                                    })
+                                }
+                            }
+                        }
+                    )
+                )
+            }
+
+            if (response.status.isSuccess()) {
+                val parsed: EmailFromUserResponseDto = response.body()
+                NetworkResult.Success(parsed)
+            } else {
+                val errorBody = response.bodyAsText()
+                val errorMsg = parseErrorMessage(errorBody, "Server error (${response.status.value})")
+                NetworkResult.Error(response.status.value, errorMsg)
+            }
+        } catch (e: Throwable) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            NetworkResult.Exception(e)
+        }
+    }
+
+    override suspend fun fetchUserTickets(accessToken: String): NetworkResult<List<SupportTicketResponseDTO>> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/support/tickets",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun fetchTicketDetails(accessToken: String, ticketNumber: String): NetworkResult<SupportTicketResponseDTO> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/support/tickets/$ticketNumber",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun fetchTicketMessages(accessToken: String, ticketNumber: String): NetworkResult<List<SupportTicketMessageResponseDTO>> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/support/tickets/$ticketNumber/messages",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun fetchTicketsHome(accessToken: String): NetworkResult<SupportTicketHomeResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/support/tickets/home",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun createTicket(
+        accessToken: String,
+        requestDto: CreateSupportTicketRequestDTO,
+        files: List<SupportAttachment>,
+    ): NetworkResult<SupportTicketResponseDTO> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        val requestJson = jsonParser.encodeToString(CreateSupportTicketRequestDTO.serializer(), requestDto)
+
+        return try {
+            val response = ktorClient.post("$baseUrl/support/tickets") {
+                authHeader.forEach { (key, value) -> header(key, value) }
+                setBody(
+                    MultiPartFormDataContent(
+                        formData {
+                            append("ticket", requestJson, Headers.build {
+                                append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                            })
+                            files.forEach { att ->
+                                if (att.bytes != null) {
+                                    append("files", att.bytes, Headers.build {
+                                        append(HttpHeaders.ContentDisposition, "filename=\"${att.name}\"")
+                                        append(HttpHeaders.ContentType, att.mimeType)
+                                    })
+                                }
+                            }
+                        }
+                    )
+                )
+            }
+
+            if (response.status.isSuccess()) {
+                val parsed: SupportTicketResponseDTO = response.body()
+                NetworkResult.Success(parsed)
+            } else {
+                val errorBody = response.bodyAsText()
+                val errorMsg = parseErrorMessage(errorBody, "Server error (${response.status.value})")
+                NetworkResult.Error(response.status.value, errorMsg)
+            }
+        } catch (e: Throwable) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            NetworkResult.Exception(e)
+        }
     }
 
     private suspend inline fun <reified T> executeKtorRequest(

@@ -41,5 +41,29 @@ class AppContainer {
         userSessionRepository = userSessionRepository
     )
 
+    val profileRepository: com.muscleplay.app.feature.profile.data.ProfileRepository =
+        com.muscleplay.app.feature.profile.data.ProfileRepositoryImpl(
+            apiClient = apiClient,
+            tokenStorageManager = tokenStorageManager
+        )
+
+    val supportRepository: com.muscleplay.app.feature.profile.support.data.SupportRepository =
+        com.muscleplay.app.feature.profile.support.data.SupportRepositoryImpl(
+            apiClient = apiClient,
+            tokenStorageManager = tokenStorageManager
+        )
+
+    val emailSupportRepository: com.muscleplay.app.feature.profile.support.data.EmailSupportRepository =
+        com.muscleplay.app.feature.profile.support.data.EmailSupportRepositoryImpl(
+            apiClient = apiClient,
+            tokenStorageManager = tokenStorageManager
+        )
+
+    val ticketRepository: com.muscleplay.app.feature.profile.support.data.TicketRepository =
+        com.muscleplay.app.feature.profile.support.data.TicketRepositoryImpl(
+            apiClient = apiClient,
+            tokenStorageManager = tokenStorageManager
+        )
+
     val mealDao: MealDao = InMemoryMealDao()
 }

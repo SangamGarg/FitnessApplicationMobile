@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -53,6 +56,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,6 +74,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -92,12 +97,16 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
+import com.muscleplay.app.core.network.auth.UserSessionRepository
 import com.muscleplay.app.feature.auth.AuthRepository
+import com.muscleplay.app.feature.home.data.DashboardRepository
+import com.muscleplay.app.feature.profile.data.ProfileRepository
 import kotlinx.coroutines.launch
 
 private val OrangePrimary = Color(0xFFFF5722)
@@ -110,6 +119,7 @@ private val CyanAccent = Color(0xFF00E5FF)
 private val GreenAccent = Color(0xFF00E676)
 private val TextMuted = Color(0xFF9E9B9E)
 
+@Immutable
 data class ProgressPhoto(
     val id: String,
     val title: String,
@@ -128,6 +138,7 @@ val sampleProgressPhotos = listOf(
     ProgressPhoto("8", "Day 100 - Master Level", "Jan 10, 2025", "Ready for advanced workouts")
 )
 
+@Immutable
 data class AchievementBadge(
     val id: String,
     val title: String,
@@ -139,38 +150,19 @@ data class AchievementBadge(
 
 val sampleAchievementBadges = listOf(
     AchievementBadge(
-        "1",
-        "First 100 Reps",
-        "🥇",
-        true,
-        "Complete 100 total reps in workouts",
-        "100 / 100 Done"
-    ),
-    AchievementBadge(
-        "2",
-        "14-Day Streak Titan",
-        "🔥",
-        true,
-        "Maintain a 14-day workout streak",
-        "14 / 14 Days"
-    ),
-    AchievementBadge(
+        "1", "First 100 Reps", "🥇", true, "Complete 100 total reps in workouts", "100 / 100 Done"
+    ), AchievementBadge(
+        "2", "14-Day Streak Titan", "🔥", true, "Maintain a 14-day workout streak", "14 / 14 Days"
+    ), AchievementBadge(
         "3",
         "Boss Battle Conqueror",
         "👑",
         true,
         "Defeat a Boss Battle in Fitness Games",
         "Boss Defeated"
-    ),
-    AchievementBadge(
-        "4",
-        "1,000 MP Coins Earner",
-        "🪙",
-        true,
-        "Earn 1,000 total MP Coins",
-        "1,250 MP Earned"
-    ),
-    AchievementBadge(
+    ), AchievementBadge(
+        "4", "1,000 MP Coins Earner", "🪙", true, "Earn 1,000 total MP Coins", "1,250 MP Earned"
+    ), AchievementBadge(
         "5",
         "50 Squat Speed Demon",
         "⚡",
@@ -180,6 +172,7 @@ val sampleAchievementBadges = listOf(
     )
 )
 
+@Immutable
 data class SocialHandleItem(
     val name: String,
     val handle: String,
@@ -188,42 +181,12 @@ data class SocialHandleItem(
     val url: String,
 )
 
-val socialHandlesList = listOf(
-    SocialHandleItem(
-        name = "Instagram",
-        handle = "@MusclePlayApp",
-        icon = Icons.Default.PhotoCamera,
-        iconColor = Color(0xFFE1306C),
-        url = "https://instagram.com/MusclePlayApp"
-    ),
-    SocialHandleItem(
-        name = "YouTube",
-        handle = "MusclePlay Official",
-        icon = Icons.Default.PlayCircle,
-        iconColor = Color(0xFFFF0000),
-        url = "https://youtube.com/@MusclePlayOfficial"
-    ),
-    SocialHandleItem(
-        name = "X (Twitter)",
-        handle = "@MusclePlay",
-        icon = Icons.Default.AlternateEmail,
-        iconColor = Color(0xFF1DA1F2),
-        url = "https://x.com/MusclePlay"
-    ),
-    SocialHandleItem(
-        name = "Discord Community",
-        handle = "discord.gg/muscleplay",
-        icon = Icons.Default.Forum,
-        iconColor = Color(0xFF5865F2),
-        url = "https://discord.gg/muscleplay"
-    )
-)
-
 @Composable
 fun ProfileScreen(
     authRepository: AuthRepository? = null,
-    dashboardRepository: com.muscleplay.app.feature.home.data.DashboardRepository? = null,
-    userSessionRepository: com.muscleplay.app.core.network.auth.UserSessionRepository? = null,
+    dashboardRepository: DashboardRepository? = null,
+    userSessionRepository: UserSessionRepository? = null,
+    profileRepository: ProfileRepository? = null,
     onNavigateToSettings: () -> Unit = {},
     onNavigateToHelp: () -> Unit = {},
     onNavigateToDiagnostics: () -> Unit = {},
@@ -234,10 +197,27 @@ fun ProfileScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
-    val sessionProfile by (userSessionRepository?.userProfile?.collectAsState() ?: remember { mutableStateOf(null) })
+    val sessionProfile by (userSessionRepository?.userProfile?.collectAsState()
+        ?: remember { mutableStateOf(null) })
+
+    val profileViewModel = remember(profileRepository) {
+        profileRepository?.let {
+            ProfileViewModel(it, coroutineScope)
+        }
+    }
+
+    val feedbackState by (profileViewModel?.feedbackState?.collectAsState()
+        ?: remember { mutableStateOf<FeedbackSubmitState>(FeedbackSubmitState.Idle) })
+
+    val followUsState by (profileViewModel?.followUsState?.collectAsState()
+        ?: remember { mutableStateOf<FollowUsUiState>(FollowUsUiState.Loading) })
 
     val viewModel = remember(dashboardRepository) {
-        dashboardRepository?.let { com.muscleplay.app.feature.home.DashboardViewModel(it, coroutineScope) }
+        dashboardRepository?.let {
+            com.muscleplay.app.feature.home.DashboardViewModel(
+                it, coroutineScope
+            )
+        }
     }
 
     val uiState by (viewModel?.uiState?.collectAsState() ?: remember {
@@ -255,8 +235,10 @@ fun ProfileScreen(
 
     val dashboardData = (uiState as? com.muscleplay.app.feature.home.DashboardUiState.Success)?.data
     val userName = sessionProfile?.name ?: dashboardData?.user?.name ?: "Alex Fitness"
-    val userEmail = sessionProfile?.email ?: dashboardData?.user?.email ?: "alex.fitness@muscleplay.com"
-    val membershipStatus = if (sessionProfile?.profileCompleted == true || dashboardData?.user?.profileCompleted == true) "Pro Member" else "Member"
+    val userEmail =
+        sessionProfile?.email ?: dashboardData?.user?.email ?: "alex.fitness@muscleplay.com"
+    val membershipStatus =
+        if (sessionProfile?.profileCompleted == true || dashboardData?.user?.profileCompleted == true) "Pro Member" else "Member"
     val streakDays = dashboardData?.workoutAnalytics?.activeDays?.toInt() ?: 12
     val mpCoins = dashboardData?.wallet?.balanceCoins?.toInt() ?: 1250
 
@@ -307,13 +289,9 @@ fun ProfileScreen(
 
     val infiniteTransition = rememberInfiniteTransition(label = "profilePulse")
     val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 0.45f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
+        initialValue = 0.25f, targetValue = 0.45f, animationSpec = infiniteRepeatable(
+            animation = tween(3500, easing = LinearEasing), repeatMode = RepeatMode.Reverse
+        ), label = "pulseAlpha"
     )
 
     LaunchedEffect(snackbarMessage) {
@@ -324,9 +302,7 @@ fun ProfileScreen(
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DarkBackground)
+        modifier = Modifier.fillMaxSize().background(DarkBackground)
     ) {
         // Ambient Background Radial Glow
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -342,18 +318,14 @@ fun ProfileScreen(
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        OrangeSecondary.copy(alpha = pulseAlpha * 0.5f),
-                        Color.Transparent
-                    ),
-                    center = Offset(w * 0.15f, h * 0.8f),
-                    radius = w * 0.65f
+                        OrangeSecondary.copy(alpha = pulseAlpha * 0.5f), Color.Transparent
+                    ), center = Offset(w * 0.15f, h * 0.8f), radius = w * 0.65f
                 )
             )
         }
 
         Scaffold(
-            containerColor = Color.Transparent,
-            snackbarHost = {
+            containerColor = Color.Transparent, snackbarHost = {
                 SnackbarHost(
                     hostState = snackbarHostState,
                     modifier = Modifier.padding(bottom = 88.dp, start = 16.dp, end = 16.dp)
@@ -367,12 +339,9 @@ fun ProfileScreen(
                         dismissActionContentColor = TextMuted
                     )
                 }
-            }
-        ) { innerPadding ->
+            }) { innerPadding ->
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .nestedScroll(nestedScrollConnection)
+                modifier = Modifier.fillMaxSize().nestedScroll(nestedScrollConnection)
             ) {
                 // Pinned Header with Level & XP Bar
                 Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp)) {
@@ -393,10 +362,7 @@ fun ProfileScreen(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 16.dp,
-                        bottom = 90.dp
+                        start = 16.dp, end = 16.dp, top = 16.dp, bottom = 90.dp
                     ),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
@@ -404,8 +370,7 @@ fun ProfileScreen(
                     item {
                         GlassTrophiesAndBadgesSection(
                             badges = sampleAchievementBadges,
-                            onBadgeClick = { badge -> selectedBadgeDetail = badge }
-                        )
+                            onBadgeClick = { badge -> selectedBadgeDetail = badge })
                     }
 
                     // Progress Gallery Section with Transformation Compare Button
@@ -441,11 +406,9 @@ fun ProfileScreen(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         GlassProgressGallerySection(
-                            photos = sampleProgressPhotos.take(4),
-                            onImageClick = { photo ->
+                            photos = sampleProgressPhotos.take(4), onImageClick = { photo ->
                                 snackbarMessage = "Viewing ${photo.title}"
-                            }
-                        )
+                            })
                     }
 
                     item {
@@ -465,58 +428,49 @@ fun ProfileScreen(
                                 icon = Icons.Default.AccountBalanceWallet,
                                 title = "MP Coins",
                                 subtitle = "Buy, earn via invites, play games, cash out & view history",
-                                onClick = { onNavigateToCoinRedemption() }
-                            )
+                                onClick = { onNavigateToCoinRedemption() })
                             GlassProfileMenuItem(
                                 icon = Icons.Default.Settings,
                                 title = "Settings & Preferences",
                                 subtitle = "Preferences, notifications, theme",
-                                onClick = { onNavigateToSettings() }
-                            )
+                                onClick = { onNavigateToSettings() })
                             // Task 4: Export Workout Logs Report
                             GlassProfileMenuItem(
                                 icon = Icons.Default.SaveAlt,
                                 title = "Export Workout Logs & Analytics",
                                 subtitle = "Download PDF report or CSV spreadsheet",
-                                onClick = { showExportDialog = true }
-                            )
+                                onClick = { showExportDialog = true })
                             GlassProfileMenuItem(
                                 icon = Icons.Default.HealthAndSafety,
                                 title = "Self-Diagnostics Check",
                                 subtitle = "Verify camera, sensors, and app health",
-                                onClick = { onNavigateToDiagnostics() }
-                            )
+                                onClick = { onNavigateToDiagnostics() })
                             GlassProfileMenuItem(
                                 icon = Icons.AutoMirrored.Filled.HelpOutline,
                                 title = "Help & Support",
                                 subtitle = "FAQs, contact support, guides",
-                                onClick = { onNavigateToHelp() }
-                            )
+                                onClick = { onNavigateToHelp() })
                             GlassProfileMenuItem(
                                 icon = Icons.Default.Feedback,
                                 title = "Tell Us What You Think",
                                 subtitle = "Share your feedback & feature requests",
-                                onClick = { showFeedbackBottomSheet = true }
-                            )
+                                onClick = { showFeedbackBottomSheet = true })
                             GlassProfileMenuItem(
                                 icon = Icons.Default.Star,
                                 title = "Rate and Review Us",
                                 subtitle = "Support MusclePlay on the Play Store",
-                                onClick = { showRateDialog = true }
-                            )
+                                onClick = { showRateDialog = true })
                             GlassProfileMenuItem(
                                 icon = Icons.Default.Share,
                                 title = "Follow Us On",
                                 subtitle = "Instagram, YouTube, X, and Community",
-                                onClick = { showFollowDialog = true }
-                            )
+                                onClick = { showFollowDialog = true })
                             GlassProfileMenuItem(
                                 icon = Icons.AutoMirrored.Filled.Logout,
                                 title = "Logout",
                                 subtitle = "Sign out of your MusclePlay account",
                                 tint = Color(0xFFFF5252),
-                                onClick = { showLogoutDialog = true }
-                            )
+                                onClick = { showLogoutDialog = true })
                         }
                     }
                 }
@@ -530,9 +484,7 @@ fun ProfileScreen(
                     containerColor = CardBackground,
                     icon = {
                         Box(
-                            modifier = Modifier
-                                .size(52.dp)
-                                .clip(CircleShape)
+                            modifier = Modifier.size(52.dp).clip(CircleShape)
                                 .background(OrangePrimary.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -541,9 +493,7 @@ fun ProfileScreen(
                     },
                     title = {
                         Text(
-                            badge.title,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            badge.title, fontWeight = FontWeight.Bold, color = Color.White
                         )
                     },
                     text = {
@@ -560,8 +510,7 @@ fun ProfileScreen(
                             Surface(
                                 color = if (badge.isUnlocked) GreenAccent.copy(alpha = 0.2f) else Color.White.copy(
                                     alpha = 0.08f
-                                ),
-                                shape = RoundedCornerShape(8.dp)
+                                ), shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
                                     text = if (badge.isUnlocked) "UNLOCKED 🎉" else "LOCKED 🔒",
@@ -578,8 +527,7 @@ fun ProfileScreen(
                             onClick = {
                                 selectedBadgeDetail = null
                                 snackbarMessage = "Sharing ${badge.title} badge..."
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                            }, colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
                         ) {
                             Text("Share Badge 📲", fontWeight = FontWeight.Bold)
                         }
@@ -588,8 +536,7 @@ fun ProfileScreen(
                         TextButton(onClick = { selectedBadgeDetail = null }) {
                             Text("Close", color = TextMuted)
                         }
-                    }
-                )
+                    })
             }
 
             // Transformation Comparison Modal
@@ -603,9 +550,7 @@ fun ProfileScreen(
                     containerColor = CardBackground,
                     icon = {
                         Box(
-                            modifier = Modifier
-                                .size(52.dp)
-                                .clip(CircleShape)
+                            modifier = Modifier.size(52.dp).clip(CircleShape)
                                 .background(OrangePrimary.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -646,13 +591,11 @@ fun ProfileScreen(
                             onClick = {
                                 showCompareDialog = false
                                 snackbarMessage = "Transformation comparison saved!"
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                            }, colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
                         ) {
                             Text("Done", fontWeight = FontWeight.Bold)
                         }
-                    }
-                )
+                    })
             }
 
             // Export Workout Logs Modal
@@ -663,9 +606,7 @@ fun ProfileScreen(
                     containerColor = CardBackground,
                     icon = {
                         Box(
-                            modifier = Modifier
-                                .size(52.dp)
-                                .clip(CircleShape)
+                            modifier = Modifier.size(52.dp).clip(CircleShape)
                                 .background(OrangePrimary.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -712,8 +653,7 @@ fun ProfileScreen(
                                 modifier = Modifier.fillMaxWidth().height(46.dp),
                                 shape = RoundedCornerShape(14.dp),
                                 border = androidx.compose.foundation.BorderStroke(
-                                    1.dp,
-                                    OrangeSecondary
+                                    1.dp, OrangeSecondary
                                 ),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeSecondary)
                             ) {
@@ -726,8 +666,7 @@ fun ProfileScreen(
                         TextButton(onClick = { showExportDialog = false }) {
                             Text("Cancel", color = TextMuted)
                         }
-                    }
-                )
+                    })
             }
 
             // Dark Glassmorphic 3-Option Logout Confirmation Dialog
@@ -738,9 +677,7 @@ fun ProfileScreen(
                     containerColor = CardBackground,
                     icon = {
                         Box(
-                            modifier = Modifier
-                                .size(52.dp)
-                                .clip(CircleShape)
+                            modifier = Modifier.size(52.dp).clip(CircleShape)
                                 .background(Color(0xFFFF5252).copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -779,11 +716,27 @@ fun ProfileScreen(
                                 },
                                 modifier = Modifier.fillMaxWidth().height(48.dp),
                                 shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252))
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(
+                                        0xFFFF5252
+                                    )
+                                )
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Icon(Icons.Default.PhonelinkOff, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                                    Text("Logout from This Device 📱", fontWeight = FontWeight.Bold, color = Color.White)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.PhonelinkOff,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        "Logout from This Device 📱",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
                                 }
                             }
 
@@ -798,12 +751,26 @@ fun ProfileScreen(
                                 },
                                 modifier = Modifier.fillMaxWidth().height(48.dp),
                                 shape = RoundedCornerShape(16.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, OrangeSecondary),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp, OrangeSecondary
+                                ),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeSecondary)
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Icon(Icons.Default.PublicOff, contentDescription = null, tint = OrangeSecondary, modifier = Modifier.size(18.dp))
-                                    Text("Logout from All Devices 🌐", fontWeight = FontWeight.Bold, color = OrangeSecondary)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.PublicOff,
+                                        contentDescription = null,
+                                        tint = OrangeSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        "Logout from All Devices 🌐",
+                                        fontWeight = FontWeight.Bold,
+                                        color = OrangeSecondary
+                                    )
                                 }
                             }
                         }
@@ -813,18 +780,35 @@ fun ProfileScreen(
                         TextButton(onClick = { showLogoutDialog = false }) {
                             Text("Cancel", color = TextMuted, fontWeight = FontWeight.Bold)
                         }
+                    })
+            }
+
+            val feedbackError = (feedbackState as? FeedbackSubmitState.Error)?.message
+
+            LaunchedEffect(feedbackState) {
+                when (val state = feedbackState) {
+                    is FeedbackSubmitState.Success -> {
+                        snackbarMessage = state.message
+                        showFeedbackBottomSheet = false
+                        profileViewModel?.resetFeedbackState()
                     }
-                )
+
+                    else -> {}
+                }
             }
 
             if (showFeedbackBottomSheet) {
                 GlassFeedbackBottomSheet(
-                    onDismiss = { showFeedbackBottomSheet = false },
-                    onSubmit = { _, _, _ ->
+                    isSubmitting = feedbackState is FeedbackSubmitState.Submitting,
+                    errorMessage = feedbackError,
+                    onDismiss = {
                         showFeedbackBottomSheet = false
-                        snackbarMessage = "Thank you for your feedback!"
-                    }
-                )
+                        profileViewModel?.resetFeedbackState()
+                    },
+                    onSubmit = { text ->
+                        profileViewModel?.resetFeedbackState()
+                        profileViewModel?.submitFeedback(text.trim())
+                    })
             }
 
             if (showRateDialog) {
@@ -834,9 +818,7 @@ fun ProfileScreen(
                     containerColor = CardBackground,
                     icon = {
                         Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
+                            modifier = Modifier.size(56.dp).clip(CircleShape)
                                 .background(OrangePrimary.copy(alpha = 0.2f))
                                 .border(1.dp, OrangePrimary.copy(alpha = 0.5f), CircleShape),
                             contentAlignment = Alignment.Center
@@ -899,39 +881,25 @@ fun ProfileScreen(
                         TextButton(onClick = { showRateDialog = false }) {
                             Text("Later", color = TextMuted)
                         }
-                    }
-                )
+                    })
             }
 
             if (showFollowDialog) {
                 val uriHandler = LocalUriHandler.current
 
+                LaunchedEffect(showFollowDialog) {
+                    profileViewModel?.loadFollowUsLinks()
+                }
+
                 AlertDialog(
                     onDismissRequest = { showFollowDialog = false },
                     shape = RoundedCornerShape(24.dp),
                     containerColor = CardBackground,
-                    icon = {
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(OrangePrimary.copy(alpha = 0.2f))
-                                .border(1.dp, OrangePrimary.copy(alpha = 0.5f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Public,
-                                contentDescription = "Community",
-                                tint = OrangeSecondary,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                    },
                     title = {
                         Text(
                             text = "Follow Us On 🌐",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.ExtraBold,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                     },
@@ -939,18 +907,92 @@ fun ProfileScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(
                                 text = "Stay updated with workout challenges, tips & community events:",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = Color.White.copy(alpha = 0.85f)
                             )
 
-                            socialHandlesList.forEach { item ->
-                                SocialHandleRowItem(
-                                    item = item,
-                                    onClick = {
-                                        showFollowDialog = false
-                                        uriHandler.openUri(item.url)
+                            when (val followState = followUsState) {
+                                is FollowUsUiState.Loading -> {
+                                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        repeat(3) {
+                                            SocialHandleRowShimmerItem()
+                                        }
                                     }
-                                )
+                                }
+
+                                is FollowUsUiState.Success -> {
+                                    LazyColumn(
+                                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                                        modifier = Modifier.heightIn(max = 280.dp)
+                                    ) {
+                                        items(
+                                            followState.links,
+                                            key = { it.id ?: it.title ?: "" }) { dto ->
+                                            val (icon, color) = mapFollowUsIcon(dto.iconKey)
+                                            val item = SocialHandleItem(
+                                                name = dto.title ?: "MusclePlay",
+                                                handle = dto.subtitle ?: "@MusclePlayApp",
+                                                icon = icon,
+                                                iconColor = color,
+                                                url = dto.url ?: ""
+                                            )
+                                            SocialHandleRowItem(
+                                                item = item, onClick = {
+                                                    val opened = launchSafeUrl(dto.url, uriHandler)
+                                                    if (!opened) {
+                                                        snackbarMessage = "Unable to open link"
+                                                    } else {
+                                                        showFollowDialog = false
+                                                    }
+                                                })
+                                        }
+                                    }
+                                }
+
+                                is FollowUsUiState.Empty -> {
+                                    Text(
+                                        text = "No social links available at the moment.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = TextMuted,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
+                                    )
+                                }
+
+                                is FollowUsUiState.Error -> {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)
+                                    ) {
+                                        Text(
+                                            text = followState.message,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = TextMuted,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        OutlinedButton(
+                                            onClick = {
+                                                profileViewModel?.loadFollowUsLinks(
+                                                    forceRefresh = true
+                                                )
+                                            },
+                                            shape = RoundedCornerShape(14.dp),
+                                            border = androidx.compose.foundation.BorderStroke(
+                                                1.dp, OrangePrimary
+                                            ),
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                contentColor = OrangePrimary
+                                            )
+                                        ) {
+                                            Text(
+                                                "Retry",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     },
@@ -962,8 +1004,7 @@ fun ProfileScreen(
                         ) {
                             Text("Close", fontWeight = FontWeight.Bold, color = Color.White)
                         }
-                    }
-                )
+                    })
             }
         }
     }
@@ -992,9 +1033,7 @@ fun GlassProgressGallerySection(
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Box(
-                        modifier = Modifier
-                            .size(50.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                        modifier = Modifier.size(50.dp).clip(RoundedCornerShape(12.dp))
                             .background(OrangePrimary.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
@@ -1040,9 +1079,7 @@ fun GlassProfileMenuItem(
         border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -1052,11 +1089,8 @@ fun GlassProfileMenuItem(
                 modifier = Modifier.weight(1f)
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(tint.copy(alpha = 0.18f)),
-                    contentAlignment = Alignment.Center
+                    modifier = Modifier.size(42.dp).clip(CircleShape)
+                        .background(tint.copy(alpha = 0.18f)), contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         icon,
@@ -1095,10 +1129,13 @@ fun GlassProfileMenuItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GlassFeedbackBottomSheet(
+    isSubmitting: Boolean = false,
+    errorMessage: String? = null,
     onDismiss: () -> Unit,
-    onSubmit: (rating: Int, category: String, text: String) -> Unit,
+    onSubmit: (text: String) -> Unit,
 ) {
     var feedbackText by remember { mutableStateOf("") }
+    val isEnabled = feedbackText.isNotBlank() && !isSubmitting
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1108,6 +1145,8 @@ fun GlassFeedbackBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
@@ -1123,39 +1162,170 @@ fun GlassFeedbackBottomSheet(
                 color = TextMuted
             )
 
-            OutlinedTextField(
-                value = feedbackText,
-                onValueChange = { feedbackText = it },
-                placeholder = {
+            if (!errorMessage.isNullOrBlank()) {
+                Surface(
+                    color = OrangePrimary.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text(
-                        "Describe your feedback or feature request...",
-                        color = TextMuted
+                        //text = errorMessage,
+                        text = "Error Occurred While Submitting Feedback. Please Try Again.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OrangePrimary,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                     )
-                },
-                modifier = Modifier.fillMaxWidth().height(120.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = OrangePrimary,
-                    unfocusedBorderColor = CardBorderColor
-                )
-            )
+                }
+            }
 
-            Button(
-                onClick = {
-                    if (feedbackText.isNotBlank()) {
-                        onSubmit(5, "General", feedbackText)
-                    }
-                },
-                enabled = feedbackText.isNotBlank(),
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
-            ) {
-                Text("Submit Feedback 🚀", fontWeight = FontWeight.Bold, color = Color.White)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                OutlinedTextField(
+                    value = feedbackText,
+                    onValueChange = { input ->
+                        if (input.length <= 500) {
+                            feedbackText = input
+                        }
+                    },
+                    placeholder = {
+                        Text(
+                            "Describe your feedback or feature request...", color = TextMuted
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    enabled = !isSubmitting,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = OrangePrimary,
+                        unfocusedBorderColor = CardBorderColor
+                    )
+                )
+
+                Text(
+                    text = "${feedbackText.length}/500",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (feedbackText.length == 500) OrangePrimary else TextMuted,
+                    fontSize = 11.sp,
+                    modifier = Modifier.align(Alignment.End)
+                )
+            }
+
+            if (isSubmitting) {
+                Button(
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary.copy(alpha = 0.6f))
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp
+                    )
+                }
+            } else if (isEnabled) {
+                Button(
+                    onClick = {
+                        if (feedbackText.isNotBlank()) {
+                            onSubmit(feedbackText)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
+                ) {
+                    Text("Submit Feedback 🚀", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            } else {
+                OutlinedButton(
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp, Color.White.copy(alpha = 0.2f)
+                    ),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        disabledContentColor = Color.White.copy(
+                            alpha = 0.4f
+                        )
+                    )
+                ) {
+                    Text("Submit Feedback 🚀", fontWeight = FontWeight.Bold)
+                }
             }
         }
+    }
+}
+
+@Composable
+fun SocialHandleRowShimmerItem() {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f, targetValue = 0.6f, animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing), repeatMode = RepeatMode.Reverse
+        ), label = "alpha"
+    )
+
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(58.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = CardBackground,
+        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier.size(38.dp).clip(CircleShape)
+                    .background(Color.White.copy(alpha = alpha))
+            )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxWidth(0.5f).height(14.dp)
+                        .clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = alpha))
+                )
+                Box(
+                    modifier = Modifier.fillMaxWidth(0.35f).height(10.dp)
+                        .clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = alpha))
+                )
+            }
+        }
+    }
+}
+
+private fun mapFollowUsIcon(iconKey: String?): Pair<ImageVector, Color> {
+    return when (iconKey?.uppercase()?.trim()) {
+        "INSTAGRAM" -> Icons.Default.PhotoCamera to Color(0xFFE1306C)
+        "YOUTUBE" -> Icons.Default.PlayCircle to Color(0xFFFF0000)
+        "TWITTER", "X" -> Icons.Default.AlternateEmail to Color(0xFF1DA1F2)
+        "DISCORD" -> Icons.Default.Forum to Color(0xFF5865F2)
+        "FACEBOOK" -> Icons.Default.Public to Color(0xFF1877F2)
+        else -> Icons.Default.Public to OrangeSecondary
+    }
+}
+
+private fun launchSafeUrl(
+    url: String?,
+    uriHandler: androidx.compose.ui.platform.UriHandler,
+): Boolean {
+    if (url.isNullOrBlank()) return false
+    val trimmed = url.trim()
+    val isHttpOrHttps = trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith(
+        "https://",
+        ignoreCase = true
+    )
+    if (!isHttpOrHttps) return false
+    return try {
+        uriHandler.openUri(trimmed)
+        true
+    } catch (e: Throwable) {
+        false
     }
 }
 
@@ -1171,9 +1341,7 @@ fun ProfileStatBadge(label: String, value: String) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                label,
-                style = MaterialTheme.typography.labelSmall,
-                color = TextMuted
+                label, style = MaterialTheme.typography.labelSmall, color = TextMuted
             )
             Text(
                 value,
@@ -1236,8 +1404,7 @@ private fun GlassBadgeCard(
         shape = RoundedCornerShape(18.dp),
         color = CardBackground,
         border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            if (badge.isUnlocked) OrangePrimary.copy(alpha = 0.5f) else CardBorderColor
+            1.dp, if (badge.isUnlocked) OrangePrimary.copy(alpha = 0.5f) else CardBorderColor
         ),
         modifier = Modifier.width(100.dp).height(90.dp)
     ) {
@@ -1258,8 +1425,7 @@ private fun GlassBadgeCard(
             Surface(
                 color = if (badge.isUnlocked) OrangeSecondary.copy(alpha = 0.25f) else Color.White.copy(
                     alpha = 0.08f
-                ),
-                shape = RoundedCornerShape(6.dp)
+                ), shape = RoundedCornerShape(6.dp)
             ) {
                 Text(
                     text = if (badge.isUnlocked) "Unlocked" else "Locked",
@@ -1297,10 +1463,7 @@ private fun ComparePhotoPreviewCard(
                 color = OrangeSecondary
             )
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(110.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                modifier = Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(12.dp))
                     .background(OrangePrimary.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -1319,9 +1482,7 @@ private fun ComparePhotoPreviewCard(
                 maxLines = 1
             )
             Text(
-                photo.date,
-                style = MaterialTheme.typography.labelSmall,
-                color = TextMuted
+                photo.date, style = MaterialTheme.typography.labelSmall, color = TextMuted
             )
         }
     }
@@ -1340,9 +1501,7 @@ private fun SocialHandleRowItem(
         border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -1351,9 +1510,7 @@ private fun SocialHandleRowItem(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
+                    modifier = Modifier.size(38.dp).clip(CircleShape)
                         .background(item.iconColor.copy(alpha = 0.2f)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1410,38 +1567,28 @@ fun GlassCollapsibleProfileCard(
     val cornerRadius = (22.dp - (6.dp * collapseProgress))
 
     GlassContainer(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(cardHeight),
+        modifier = Modifier.fillMaxWidth().height(cardHeight),
         shape = RoundedCornerShape(cornerRadius)
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = Modifier.fillMaxSize()
                 .padding(horizontal = cardPaddingHorizontal, vertical = cardPaddingVertical),
             contentAlignment = Alignment.Center
         ) {
             if (collapseProgress < 0.5f) {
                 val alpha = (1f - (collapseProgress * 2f)).coerceIn(0f, 1f)
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .graphicsLayer { this.alpha = alpha },
+                    modifier = Modifier.fillMaxWidth().graphicsLayer { this.alpha = alpha },
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(
-                        modifier = Modifier
-                            .size(avatarSize)
-                            .clip(CircleShape)
-                            .background(
+                        modifier = Modifier.size(avatarSize).clip(CircleShape).background(
                                 Brush.linearGradient(
                                     listOf(
-                                        OrangePrimary,
-                                        OrangeSecondary
+                                        OrangePrimary, OrangeSecondary
                                     )
                                 )
-                            ),
-                        contentAlignment = Alignment.Center
+                            ), contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Person,
@@ -1503,9 +1650,7 @@ fun GlassCollapsibleProfileCard(
 
                         LinearProgressIndicator(
                             progress = { currentXp.toFloat() / targetXp },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(4.dp)
+                            modifier = Modifier.fillMaxWidth().height(4.dp)
                                 .clip(RoundedCornerShape(2.dp)),
                             color = OrangePrimary,
                             trackColor = CardBorderColor
@@ -1532,9 +1677,7 @@ fun GlassCollapsibleProfileCard(
             } else {
                 val alpha = ((collapseProgress - 0.5f) * 2f).coerceIn(0f, 1f)
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .graphicsLayer { this.alpha = alpha },
+                    modifier = Modifier.fillMaxWidth().graphicsLayer { this.alpha = alpha },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -1544,18 +1687,13 @@ fun GlassCollapsibleProfileCard(
                         modifier = Modifier.weight(1f)
                     ) {
                         Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(
+                            modifier = Modifier.size(36.dp).clip(CircleShape).background(
                                     Brush.linearGradient(
                                         listOf(
-                                            OrangePrimary,
-                                            OrangeSecondary
+                                            OrangePrimary, OrangeSecondary
                                         )
                                     )
-                                ),
-                            contentAlignment = Alignment.Center
+                                ), contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Person,
@@ -1580,14 +1718,11 @@ fun GlassCollapsibleProfileCard(
                                     modifier = Modifier.weight(1f, fill = false)
                                 )
                                 Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(50))
-                                        .background(
+                                    modifier = Modifier.clip(RoundedCornerShape(50)).background(
                                             Brush.linearGradient(
                                                 listOf(OrangePrimary, OrangeSecondary)
                                             )
-                                        )
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                        ).padding(horizontal = 8.dp, vertical = 2.dp)
                                 ) {
                                     Text(
                                         text = membershipStatus,
@@ -1629,13 +1764,8 @@ fun GlassContainer(
     content: @Composable () -> Unit,
 ) {
     Box(
-        modifier = modifier
-            .clip(shape)
-            .background(CardBackground)
-            .border(
-                width = 1.dp,
-                color = CardBorderColor,
-                shape = shape
+        modifier = modifier.clip(shape).background(CardBackground).border(
+                width = 1.dp, color = CardBorderColor, shape = shape
             )
     ) {
         content()
@@ -1649,11 +1779,9 @@ private fun createSampleProfileDashboardDto(): com.muscleplay.app.core.network.d
             email = "alex.fitness@muscleplay.com",
             name = "Alex Fitness",
             profileCompleted = true
-        ),
-        workoutAnalytics = com.muscleplay.app.core.network.dto.WorkoutAnalyticsOverviewResponse(
+        ), workoutAnalytics = com.muscleplay.app.core.network.dto.WorkoutAnalyticsOverviewResponse(
             activeDays = 12
-        ),
-        wallet = com.muscleplay.app.core.network.dto.DashboardResponseDto.WalletSummary(
+        ), wallet = com.muscleplay.app.core.network.dto.DashboardResponseDto.WalletSummary(
             balanceCoins = 1250
         )
     )
