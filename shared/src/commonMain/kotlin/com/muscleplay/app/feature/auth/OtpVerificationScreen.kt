@@ -165,7 +165,7 @@ fun OtpVerificationScreen(
             } else {
                 // Post-Verification (HTTP 200 Success): proceed to loginRegister
                 val authResult = authRepository?.authenticateWithEmail(
-                    targetEmail, targetPassword, isSignUp = true
+                    targetEmail, targetPassword, isSignUp = true, referralCode = authFlowData.pendingReferralCode
                 )
                 isVerifying = false
                 if (authResult is NetworkResult.Error) {

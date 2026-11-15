@@ -27,7 +27,7 @@ sealed interface FollowUsUiState {
 
 class ProfileViewModel(
     private val repository: ProfileRepository,
-    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main + Job())
+    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main + Job()),
 ) {
     private val _feedbackState = MutableStateFlow<FeedbackSubmitState>(FeedbackSubmitState.Idle)
     val feedbackState: StateFlow<FeedbackSubmitState> = _feedbackState.asStateFlow()
@@ -82,7 +82,9 @@ class ProfileViewModel(
                 }
 
                 is NetworkResult.Error -> {
-                    _followUsState.value = FollowUsUiState.Error(result.message)
+//                    _followUsState.value = FollowUsUiState.Error(result.message)
+                    _followUsState.value =
+                        FollowUsUiState.Error("Unable to load links. Please try again.")
                 }
 
                 is NetworkResult.Exception -> {

@@ -5,7 +5,7 @@ object NotificationRouteWhitelist {
         "home" to Routes.HOME,
         "workouts" to Routes.WORKOUTS,
         "games" to Routes.GAMES,
-        "calculators" to Routes.CALCULATORS,
+        "analytics" to Routes.ANALYTICS,
         "profile" to Routes.PROFILE,
         "profile_coin_redemption" to Routes.PROFILE_COIN_REDEMPTION,
         "profile_my_tickets" to Routes.PROFILE_MY_TICKETS,

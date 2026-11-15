@@ -48,6 +48,7 @@ fun SignUpScreen(
     val email = remember { FieldState() }
     val password = remember { FieldState() }
     val confirmPassword = remember { FieldState() }
+    val referralCode = remember { FieldState() }
     var isPasswordVisible by remember { mutableStateOf(false) }
     var termsAccepted by remember { mutableStateOf(false) }
     var showTermsDialog by remember { mutableStateOf(false) }
@@ -61,28 +62,33 @@ fun SignUpScreen(
     val passwordRules = AuthValidator.passwordRules(password.text)
     val passwordValid = AuthValidator.isPasswordValid(password.text)
     val confirmError = AuthValidator.confirmPasswordError(password.text, confirmPassword.text)
+    val referralError = AuthValidator.referralCodeError(referralCode.text)
 
     // Errors only appear after the user has left the field (or pressed the button)
     val visibleEmailError = if (email.touched) emailError else null
     val visiblePasswordError =
         if (password.touched && !passwordValid) "Password doesn't meet all requirements" else null
     val visibleConfirmError = if (confirmPassword.touched) confirmError else null
+    val visibleReferralError = if (referralCode.touched) referralError else null
 
     // Button stays disabled until every field is filled and terms are accepted
     val canSubmit = email.text.isNotBlank() &&
             password.text.isNotEmpty() &&
             confirmPassword.text.isNotEmpty() &&
+            referralError == null &&
             termsAccepted
 
     fun submit() {
-        listOf(email, password, confirmPassword).forEach { it.touched = true }
+        listOf(email, password, confirmPassword, referralCode).forEach { it.touched = true }
         val hasErrors = emailError != null ||
                 !passwordValid ||
-                confirmError != null
+                confirmError != null ||
+                referralError != null
         if (hasErrors) {
             snackbarMessage = "Please fix the highlighted fields."
         } else {
-            authRepository?.setPendingSignUpData(email.text, password.text)
+            val cleanCode = referralCode.text.trim().uppercase().takeIf { it.isNotBlank() }
+            authRepository?.setPendingSignUpData(email.text, password.text, cleanCode)
             onNavigateToOtp()
         }
     }
@@ -264,10 +270,33 @@ fun SignUpScreen(
                                     visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                                     keyboardOptions = KeyboardOptions(
                                         keyboardType = KeyboardType.Password,
+                                        imeAction = ImeAction.Next
+                                    ),
+                                    onFocusChanged = { confirmPassword.onFocusChanged(it) }
+                                )
+
+                                // Referral Code Input (Optional)
+                                AuthTextField(
+                                    value = referralCode.text,
+                                    onValueChange = { input ->
+                                        val formatted = input.uppercase().filter { !it.isWhitespace() }.take(AuthValidator.MAX_REFERRAL_CODE_LENGTH)
+                                        referralCode.text = formatted
+                                        referralCode.touched = true
+                                    },
+                                    label = "Referral Code (Optional)",
+                                    leadingIcon = Icons.Default.CardGiftcard,
+                                    errorText = visibleReferralError,
+                                    supportingText = "Example: IN-MP-A8K2 (XX-MP-XXXX)",
+                                    keyboardOptions = KeyboardOptions(
+                                        capitalization = KeyboardCapitalization.Characters,
+                                        keyboardType = KeyboardType.Text,
                                         imeAction = ImeAction.Done
                                     ),
-                                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                                    onFocusChanged = { confirmPassword.onFocusChanged(it) }
+                                    keyboardActions = KeyboardActions(onDone = {
+                                        focusManager.clearFocus()
+                                        if (canSubmit) submit()
+                                    }),
+                                    onFocusChanged = { referralCode.onFocusChanged(it) }
                                 )
 
                                 // Terms Checkbox & Clickable Label

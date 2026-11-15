@@ -30,7 +30,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Analytics
-import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -97,7 +96,7 @@ fun HomeScreen(
     onNavigateToDiet: () -> Unit = {},
     onNavigateToWorkouts: () -> Unit = {},
     onNavigateToGames: () -> Unit = {},
-    onNavigateToCalculators: () -> Unit = {},
+    onNavigateToAnalytics: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
     onNavigateToScanner: () -> Unit = {},
     onNavigateToCoinsHub: () -> Unit = {},
@@ -183,7 +182,7 @@ fun HomeScreen(
                         onNavigateToDiet = onNavigateToDiet,
                         onNavigateToWorkouts = onNavigateToWorkouts,
                         onNavigateToGames = onNavigateToGames,
-                        onNavigateToCalculators = onNavigateToCalculators,
+                        onNavigateToAnalytics = onNavigateToAnalytics,
                         onNavigateToProfile = onNavigateToProfile,
                         onNavigateToNotifications = onNavigateToNotifications,
                         modifier = Modifier.fillMaxSize().padding(innerPadding)
@@ -201,7 +200,7 @@ private fun DashboardContent(
     onNavigateToDiet: () -> Unit,
     onNavigateToWorkouts: () -> Unit,
     onNavigateToGames: () -> Unit,
-    onNavigateToCalculators: () -> Unit,
+    onNavigateToAnalytics: () -> Unit,
     onNavigateToProfile: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     modifier: Modifier = Modifier,
@@ -254,7 +253,7 @@ private fun DashboardContent(
                 onAiCoach = onNavigateToProfile,
                 onNutrition = onNavigateToDiet,
                 onFitnessGames = onNavigateToGames,
-                onCalculators = onNavigateToCalculators,
+                onAnalytics = onNavigateToAnalytics,
                 onChatbot = onNavigateToProfile
             )
         }
@@ -489,7 +488,7 @@ private fun QuickActionsGrid(
     onAiCoach: () -> Unit,
     onNutrition: () -> Unit,
     onFitnessGames: () -> Unit,
-    onCalculators: () -> Unit,
+    onAnalytics: () -> Unit,
     onChatbot: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -529,10 +528,10 @@ private fun QuickActionsGrid(
                 modifier = Modifier.weight(1f)
             )
             ActionGridItem(
-                icon = Icons.Default.Calculate,
-                label = "Calculators",
+                icon = Icons.Default.Analytics,
+                label = "Analytics",
                 iconColor = CyanAccent,
-                onClick = onCalculators,
+                onClick = onAnalytics,
                 modifier = Modifier.weight(1f)
             )
             ActionGridItem(

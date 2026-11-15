@@ -70,6 +70,7 @@ private val jsonParser = Json {
     ignoreUnknownKeys = true
     isLenient = true
     coerceInputValues = true
+    encodeDefaults = true
 }
 
 class ApiClient(
@@ -124,9 +125,18 @@ class ApiClient(
         )
     }
 
-    override suspend fun loginRegister(firebaseIdToken: String): NetworkResult<UserRegisterResponseDto> {
+    override suspend fun loginRegister(
+        firebaseIdToken: String,
+        referralCode: String?,
+    ): NetworkResult<UserRegisterResponseDto> {
+        val cleanCode = referralCode?.trim()?.uppercase()?.takeIf { it.isNotBlank() }
+        val url = if (cleanCode != null) {
+            "$baseUrl/auth/loginRegister?referralCode=$cleanCode"
+        } else {
+            "$baseUrl/auth/loginRegister"
+        }
         return executeKtorRequest(
-            url = "$baseUrl/auth/loginRegister",
+            url = url,
             httpMethod = HttpMethod.Post,
             headers = mapOf("Authorization" to "Bearer $firebaseIdToken")
         )

@@ -8,7 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.Home
@@ -38,7 +38,7 @@ import com.muscleplay.app.feature.auth.OtpVerificationScreen
 import com.muscleplay.app.feature.auth.ResetPasswordScreen
 import com.muscleplay.app.feature.auth.SignInScreen
 import com.muscleplay.app.feature.auth.SignUpScreen
-import com.muscleplay.app.feature.calculators.CalculatorsScreen
+import com.muscleplay.app.feature.analytics.AnalyticsScreen
 import com.muscleplay.app.feature.coins.MpCoinsHubScreen
 import com.muscleplay.app.feature.diet.DietHomeScreen
 import com.muscleplay.app.feature.diet.IngredientScannerScreen
@@ -97,7 +97,7 @@ object Routes {
     const val HOME = "home"
     const val WORKOUTS = "workouts"
     const val GAMES = "games"
-    const val CALCULATORS = "calculators"
+    const val ANALYTICS = "analytics"
     const val PROFILE = "profile"
 }
 
@@ -110,7 +110,7 @@ private val tabs = listOf(
     TabItem(Routes.HOME, "Home"),
     TabItem(Routes.WORKOUTS, "Workouts"),
     TabItem(Routes.GAMES, "Games"),
-    TabItem(Routes.CALCULATORS, "Calculators"),
+    TabItem(Routes.ANALYTICS, "Analytics"),
     TabItem(Routes.PROFILE, "Profile")
 )
 
@@ -119,7 +119,7 @@ private fun getTabIcon(route: String): ImageVector {
         Routes.HOME -> Icons.Filled.Home
         Routes.WORKOUTS -> Icons.Filled.FitnessCenter
         Routes.GAMES -> Icons.Filled.Gamepad
-        Routes.CALCULATORS -> Icons.Filled.Calculate
+        Routes.ANALYTICS -> Icons.Filled.Analytics
         else -> Icons.Filled.Person
     }
 }
@@ -334,7 +334,7 @@ fun MusclePlayNavigation(
                     onNavigateToDiet = { navController.navigate(Routes.DIET_HOME) },
                     onNavigateToWorkouts = { navController.navigate(Routes.WORKOUTS) },
                     onNavigateToGames = { navController.navigate(Routes.GAMES) },
-                    onNavigateToCalculators = { navController.navigate(Routes.CALCULATORS) },
+                    onNavigateToAnalytics = { navController.navigate(Routes.ANALYTICS) },
                     onNavigateToProfile = { navController.navigate(Routes.PROFILE) },
                     onNavigateToScanner = { navController.navigate(Routes.INGREDIENT_SCANNER) },
                     onNavigateToCoinsHub = { navController.navigate(Routes.PROFILE_COIN_REDEMPTION) },
@@ -380,8 +380,8 @@ fun MusclePlayNavigation(
                         }
                     })
             }
-            composable(Routes.CALCULATORS) {
-                CalculatorsScreen()
+            composable(Routes.ANALYTICS) {
+                AnalyticsScreen()
             }
             composable(Routes.PROFILE) {
                 ProfileScreen(

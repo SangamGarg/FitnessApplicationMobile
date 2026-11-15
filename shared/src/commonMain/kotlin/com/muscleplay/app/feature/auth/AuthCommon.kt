@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -52,10 +53,25 @@ internal object AuthValidator {
     const val MAX_NAME_LENGTH = 100
     const val MIN_PASSWORD_LENGTH = 8
     const val MAX_PASSWORD_LENGTH = 64
+    const val MAX_REFERRAL_CODE_LENGTH = 10
 
     private val EMAIL_REGEX = Regex(
         "^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}$"
     )
+
+    private val REFERRAL_CODE_REGEX = Regex("^[A-Z]{2}-MP-[A-Z0-9]{4}$")
+
+    fun referralCodeError(raw: String): String? {
+        val code = raw.trim().uppercase()
+        if (code.isEmpty()) return null
+        if (code.length > MAX_REFERRAL_CODE_LENGTH) {
+            return "Referral Code cannot exceed $MAX_REFERRAL_CODE_LENGTH characters"
+        }
+        if (!REFERRAL_CODE_REGEX.matches(code)) {
+            return "Invalid Referral Code format. Example: IN-MP-A8K2"
+        }
+        return null
+    }
 
     private val NAME_ALLOWED_SYMBOLS = setOf(' ', '-', '\'', '\u2019', '.')
 
@@ -134,6 +150,7 @@ internal fun AuthTextField(
     leadingIcon: ImageVector,
     errorText: String?,
     modifier: Modifier = Modifier,
+    supportingText: String? = null,
     trailingIcon: (@Composable () -> Unit)? = null,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
@@ -143,6 +160,8 @@ internal fun AuthTextField(
     val isError = errorText != null
     val supporting: (@Composable () -> Unit)? = if (errorText != null) {
         { Text(text = errorText) }
+    } else if (!supportingText.isNullOrBlank()) {
+        { Text(text = supportingText, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp) }
     } else null
 
     OutlinedTextField(

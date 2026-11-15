@@ -1,15 +1,13 @@
-package com.muscleplay.app.feature.calculators
+package com.muscleplay.app.feature.analytics
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -51,7 +49,7 @@ private enum class MacroGoal(val label: String, val proteinPct: Double, val carb
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CalculatorsScreen() {
+fun AnalyticsScreen() {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var isImperialUnits by rememberSaveable { mutableStateOf(false) } // False = Metric (kg/cm), True = Imperial (lbs/in)
     var isMaleGender by rememberSaveable { mutableStateOf(true) }

@@ -9,7 +9,7 @@ interface AuthApiService {
     suspend fun sendForgotPasswordOtp(email: String): NetworkResult<OtpActionResponseDto>
     suspend fun verifyForgotPasswordOtp(email: String, otp: String): NetworkResult<OtpActionResponseDto>
     suspend fun resetPasswordWithOtp(request: ResetPasswordWithOtpRequestDto): NetworkResult<OtpActionResponseDto>
-    suspend fun loginRegister(firebaseIdToken: String): NetworkResult<UserRegisterResponseDto>
+    suspend fun loginRegister(firebaseIdToken: String, referralCode: String? = null): NetworkResult<UserRegisterResponseDto>
     suspend fun refreshToken(refreshToken: String): NetworkResult<RefreshTokenResponseDto>
     suspend fun logout(refreshToken: String, logoutEverywhere: Boolean = false, accessToken: String = ""): NetworkResult<Boolean>
     suspend fun addUserDetails(accessToken: String, details: UserDetailsDto): NetworkResult<UserDetailsResponseDto>

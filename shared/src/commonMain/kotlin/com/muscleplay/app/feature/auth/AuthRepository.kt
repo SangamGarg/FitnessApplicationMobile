@@ -26,6 +26,7 @@ data class AuthFlowData(
     val pendingEmail: String = "",
     val pendingPassword: String = "",
     val pendingVerificationToken: String = "",
+    val pendingReferralCode: String? = null,
 )
 
 class AuthRepository(
@@ -50,8 +51,13 @@ class AuthRepository(
     private val _authFlowData = MutableStateFlow(AuthFlowData())
     val authFlowData: StateFlow<AuthFlowData> = _authFlowData.asStateFlow()
 
-    fun setPendingSignUpData(email: String, pass: String) {
-        _authFlowData.value = AuthFlowData(pendingEmail = email, pendingPassword = pass)
+    fun setPendingSignUpData(email: String, pass: String, referralCode: String? = null) {
+        val cleanCode = referralCode?.trim()?.uppercase()?.takeIf { it.isNotBlank() }
+        _authFlowData.value = AuthFlowData(
+            pendingEmail = email,
+            pendingPassword = pass,
+            pendingReferralCode = cleanCode
+        )
     }
 
     fun setPendingResetPasswordData(email: String, token: String) {
@@ -135,6 +141,7 @@ class AuthRepository(
         email: String,
         pass: String,
         isSignUp: Boolean,
+        referralCode: String? = null,
     ): NetworkResult<Boolean> {
         _sessionState.value = SessionState.Authenticating
 
@@ -160,7 +167,13 @@ class AuthRepository(
             return NetworkResult.Error(401, "Failed to retrieve authentication token. Please try again.")
         }
 
-        return when (val backendRes = apiClient.loginRegister(realFirebaseToken)) {
+        val codeToSend = if (isSignUp) {
+            referralCode ?: authFlowData.value.pendingReferralCode
+        } else {
+            null
+        }
+
+        return when (val backendRes = apiClient.loginRegister(realFirebaseToken, codeToSend)) {
             is NetworkResult.Success -> {
                 val data = backendRes.data
                 tokenStorageManager.saveTokens(
