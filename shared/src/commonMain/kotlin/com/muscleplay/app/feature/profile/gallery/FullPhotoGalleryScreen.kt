@@ -1,9 +1,22 @@
 package com.muscleplay.app.feature.profile.gallery
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -11,29 +24,80 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.muscleplay.app.feature.profile.ProgressPhoto
-import com.muscleplay.app.feature.profile.sampleProgressPhotos
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
+import com.muscleplay.app.core.network.dto.ProgressGalleryResponseDto
+import com.muscleplay.app.feature.profile.GalleryUiState
+import com.muscleplay.app.feature.profile.ProfileViewModel
+import com.muscleplay.app.feature.profile.data.ProfileRepository
+import com.muscleplay.app.feature.profile.support.rememberAttachmentPicker
 
 private val OrangePrimary = Color(0xFFFF5722)
 private val OrangeSecondary = Color(0xFFFF9800)
 private val DarkBackground = Color(0xFF0F0F17)
+private val TextMuted = Color(0xFF9E9B9E)
+private val CardBackground = Color(0xFF181824)
+private val CardBorderColor = Color(0xFF2A283A)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FullPhotoGalleryScreen(onBack: () -> Unit) {
-    val photoList = remember { mutableStateListOf(*sampleProgressPhotos.toTypedArray()) }
-    var selectedPhoto by remember { mutableStateOf<ProgressPhoto?>(null) }
-    var showAddDialog by remember { mutableStateOf(false) }
+fun FullPhotoGalleryScreen(
+    profileRepository: ProfileRepository? = null,
+    onBack: () -> Unit,
+) {
+    val viewModel = remember(profileRepository) {
+        profileRepository?.let { ProfileViewModel(it) }
+    }
+    val galleryState by (viewModel?.galleryState?.collectAsStateWithLifecycle()
+        ?: remember { mutableStateOf<GalleryUiState>(GalleryUiState.Loading) })
+
+    var selectedPhoto by remember { mutableStateOf<ProgressGalleryResponseDto?>(null) }
+    var photoToDelete by remember { mutableStateOf<ProgressGalleryResponseDto?>(null) }
+
+    val openGalleryPicker = rememberAttachmentPicker(
+        allowedMimeTypes = listOf("image/jpeg", "image/png", "image/webp"),
+        onAttachmentsPicked = { attachments ->
+            attachments.firstOrNull()?.let { att ->
+                viewModel?.uploadGalleryImage(att)
+            }
+        }
+    )
+
+    LaunchedEffect(Unit) {
+        viewModel?.loadProgressGallery()
+    }
 
     Box(
         modifier = Modifier
@@ -47,43 +111,105 @@ fun FullPhotoGalleryScreen(onBack: () -> Unit) {
                     title = { Text("Full Progress Gallery", fontWeight = FontWeight.Bold, color = Color.White) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color.White
+                            )
                         }
                     },
                     actions = {
-                        IconButton(onClick = { showAddDialog = true }) {
-                            Icon(Icons.Default.AddAPhoto, contentDescription = "Add Progress Photo", tint = OrangeSecondary)
+                        IconButton(onClick = { openGalleryPicker() }) {
+                            Icon(
+                                Icons.Default.AddAPhoto,
+                                contentDescription = "Add Progress Photo",
+                                tint = OrangeSecondary
+                            )
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent
-                    )
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
                 )
             }
         ) { innerPadding ->
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .padding(16.dp)
             ) {
-                items(photoList) { photo ->
-                    GlassPhotoCard(
-                        photo = photo,
-                        onClick = { selectedPhoto = photo }
-                    )
+                when (val state = galleryState) {
+                    is GalleryUiState.Loading -> {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            items(6) {
+                                ShimmerGalleryTile()
+                            }
+                        }
+                    }
+
+                    is GalleryUiState.Success -> {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            items(state.items, key = { it.id }) { photo ->
+                                GlassPhotoCard(
+                                    photo = photo,
+                                    onClick = { selectedPhoto = photo }
+                                )
+                            }
+                        }
+                    }
+
+                    is GalleryUiState.Empty -> {
+                        Text(
+                            text = "No progress photos uploaded currently. Kindly upload your first progress photo! 📸",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextMuted,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().align(Alignment.Center)
+                        )
+                    }
+
+                    is GalleryUiState.Error -> {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.align(Alignment.Center)
+                        ) {
+                            Text(
+                                text = state.message,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextMuted,
+                                textAlign = TextAlign.Center
+                            )
+                            OutlinedButton(
+                                onClick = { viewModel?.loadProgressGallery(forceRefresh = true) },
+                                shape = RoundedCornerShape(14.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangePrimary)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Retry", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                 }
             }
 
-            // Glassmorphic Details Modal
+            // Photo Details Modal
             selectedPhoto?.let { photo ->
                 AlertDialog(
                     onDismissRequest = { selectedPhoto = null },
                     shape = RoundedCornerShape(28.dp),
-                    containerColor = Color(0xFF181824),
+                    containerColor = CardBackground,
                     icon = {
                         Box(
                             modifier = Modifier
@@ -92,193 +218,92 @@ fun FullPhotoGalleryScreen(onBack: () -> Unit) {
                                 .background(OrangePrimary.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Image, contentDescription = null, tint = OrangeSecondary, modifier = Modifier.size(28.dp))
+                            Icon(
+                                Icons.Default.Image,
+                                contentDescription = null,
+                                tint = OrangeSecondary,
+                                modifier = Modifier.size(28.dp)
+                            )
                         }
                     },
-                    title = { Text(photo.title, fontWeight = FontWeight.Bold, color = Color.White) },
+                    title = { Text(photo.caption?.ifBlank { "Progress Photo" } ?: "Progress Photo", fontWeight = FontWeight.Bold, color = Color.White) },
                     text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("Date: ${photo.date}", fontWeight = FontWeight.SemiBold, color = OrangeSecondary)
-                            Text("Details: ${photo.subtitle}", color = Color.White.copy(alpha = 0.85f))
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("Uploaded: ${photo.uploadedAt?.take(10) ?: "Recent"}", fontWeight = FontWeight.SemiBold, color = OrangeSecondary)
+                            Text("Category: ${photo.category ?: "Progress"}", color = Color.White.copy(alpha = 0.85f))
 
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(170.dp)
+                                    .height(200.dp)
                                     .clip(RoundedCornerShape(20.dp))
-                                    .background(
-                                        brush = Brush.linearGradient(
-                                            colors = listOf(
-                                                Color.White.copy(alpha = 0.10f),
-                                                OrangePrimary.copy(alpha = 0.20f)
-                                            )
-                                        )
-                                    )
-                                    .border(1.dp, OrangePrimary.copy(alpha = 0.4f), RoundedCornerShape(20.dp)),
+                                    .background(OrangePrimary.copy(alpha = 0.2f)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
+                                if (!photo.imageUrl.isBlank()) {
+                                    AsyncImage(
+                                        model = photo.imageUrl,
+                                        contentDescription = photo.caption,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp))
+                                    )
+                                } else {
                                     Icon(
                                         imageVector = Icons.Default.Image,
                                         contentDescription = null,
                                         modifier = Modifier.size(56.dp),
                                         tint = OrangePrimary
                                     )
-                                    Text("Encrypted Local Storage Preview", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                                 }
-                            }
-                        }
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = { selectedPhoto = null },
-                            colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary)
-                        ) {
-                            Text("Close", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                )
-            }
-
-            // Glassmorphic Add Photo Modal with Title, Subtitle Inputs & Upload Photo Option
-            if (showAddDialog) {
-                var newTitle by remember { mutableStateOf("") }
-                var newSubtitle by remember { mutableStateOf("") }
-                var attachedPhotoName by remember { mutableStateOf<String?>(null) }
-
-                val isAllThreeProvided = newTitle.isNotBlank() && newSubtitle.isNotBlank() && attachedPhotoName != null
-
-                AlertDialog(
-                    onDismissRequest = { showAddDialog = false },
-                    shape = RoundedCornerShape(28.dp),
-                    containerColor = Color(0xFF181824),
-                    icon = {
-                        Box(
-                            modifier = Modifier
-                                .size(52.dp)
-                                .clip(CircleShape)
-                                .background(OrangePrimary.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = OrangeSecondary, modifier = Modifier.size(28.dp))
-                        }
-                    },
-                    title = { Text("Add Progress Photo", fontWeight = FontWeight.Bold, color = Color.White) },
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(
-                                text = "Enter title, subtitle, and upload an image to save your new progress milestone.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.7f)
-                            )
-
-                            // 1. Photo Title Field
-                            OutlinedTextField(
-                                value = newTitle,
-                                onValueChange = { newTitle = it },
-                                label = { Text("Photo Title *") },
-                                placeholder = { Text("e.g. Day 120 - Peak Shape", color = Color.White.copy(alpha = 0.4f)) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(16.dp),
-                                singleLine = true,
-                                colors = inputColors()
-                            )
-
-                            // 2. Subtitle Field
-                            OutlinedTextField(
-                                value = newSubtitle,
-                                onValueChange = { newSubtitle = it },
-                                label = { Text("Subtitle / Notes *") },
-                                placeholder = { Text("e.g. Hit 80kg bench press goal!", color = Color.White.copy(alpha = 0.4f)) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(16.dp),
-                                singleLine = true,
-                                colors = inputColors()
-                            )
-
-                            // 3. Upload Photo Area
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("Upload Image *", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White)
-
-                                if (attachedPhotoName != null) {
-                                    Surface(
-                                        color = OrangePrimary.copy(alpha = 0.2f),
-                                        shape = RoundedCornerShape(14.dp),
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.5f)),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(18.dp))
-                                                Text(attachedPhotoName!!, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White)
-                                            }
-                                            IconButton(onClick = { attachedPhotoName = null }, modifier = Modifier.size(20.dp)) {
-                                                Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    OutlinedButton(
-                                        onClick = {
-                                            attachedPhotoName = "progress_photo_${(1000..9999).random()}.jpg"
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(46.dp),
-                                        shape = RoundedCornerShape(14.dp),
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, OrangeSecondary.copy(alpha = 0.6f)),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeSecondary)
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Icon(Icons.Default.UploadFile, contentDescription = null, tint = OrangeSecondary, modifier = Modifier.size(18.dp))
-                                            Text("Upload / Capture Image 📸", fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (!isAllThreeProvided) {
-                                Text(
-                                    text = "⚠️ Title, subtitle, and image are required to save.",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = OrangeSecondary
-                                )
                             }
                         }
                     },
                     confirmButton = {
                         Button(
                             onClick = {
-                                if (isAllThreeProvided) {
-                                    val newPhoto = ProgressPhoto(
-                                        id = "photo_${(1000..9999).random()}",
-                                        title = newTitle,
-                                        date = "Today",
-                                        subtitle = newSubtitle
-                                    )
-                                    photoList.add(0, newPhoto)
-                                    showAddDialog = false
-                                }
+                                photoToDelete = photo
+                                selectedPhoto = null
                             },
-                            enabled = isAllThreeProvided,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = OrangePrimary,
-                                disabledContainerColor = Color.White.copy(alpha = 0.12f)
-                            )
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252))
                         ) {
-                            Text("Save Photo", fontWeight = FontWeight.Bold)
+                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Delete Photo", fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showAddDialog = false }) {
-                            Text("Cancel", color = Color.White.copy(alpha = 0.6f))
+                        TextButton(onClick = { selectedPhoto = null }) {
+                            Text("Close", color = TextMuted)
+                        }
+                    }
+                )
+            }
+
+            // Confirm Delete Modal
+            photoToDelete?.let { photo ->
+                AlertDialog(
+                    onDismissRequest = { photoToDelete = null },
+                    shape = RoundedCornerShape(24.dp),
+                    containerColor = CardBackground,
+                    title = { Text("Delete Progress Photo?", fontWeight = FontWeight.Bold, color = Color.White) },
+                    text = { Text("Are you sure you want to delete this progress photo? This action cannot be undone.", color = Color.White.copy(alpha = 0.85f)) },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                viewModel?.deleteGalleryImage(photo.id)
+                                photoToDelete = null
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252))
+                        ) {
+                            Text("Delete", fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { photoToDelete = null }) {
+                            Text("Cancel", color = TextMuted)
                         }
                     }
                 )
@@ -289,71 +314,80 @@ fun FullPhotoGalleryScreen(onBack: () -> Unit) {
 
 @Composable
 private fun GlassPhotoCard(
-    photo: ProgressPhoto,
-    onClick: () -> Unit
+    photo: ProgressGalleryResponseDto,
+    onClick: () -> Unit,
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(190.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.12f),
-                        Color.White.copy(alpha = 0.04f)
-                    )
-                )
-            )
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.35f),
-                        OrangePrimary.copy(alpha = 0.25f),
-                        Color.White.copy(alpha = 0.08f)
-                    )
-                ),
-                shape = RoundedCornerShape(20.dp)
-            )
-            .clickable(onClick = onClick)
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = CardBackground,
+        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorderColor),
+        modifier = Modifier.fillMaxWidth().height(140.dp)
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier.padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(12.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(OrangePrimary.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Image,
-                    contentDescription = null,
-                    modifier = Modifier.size(56.dp),
-                    tint = OrangePrimary
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = photo.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = photo.date,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OrangeSecondary
-                )
+                if (!photo.imageUrl.isBlank()) {
+                    AsyncImage(
+                        model = photo.imageUrl,
+                        contentDescription = photo.caption,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Image,
+                        contentDescription = null,
+                        tint = OrangePrimary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
             }
+            Text(
+                photo.caption?.ifBlank { "Progress Photo" } ?: "Progress Photo",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1
+            )
+            Text(
+                photo.uploadedAt?.take(10) ?: "Recent",
+                style = MaterialTheme.typography.labelSmall,
+                color = OrangeSecondary,
+                maxLines = 1
+            )
         }
     }
 }
 
 @Composable
-private fun inputColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = Color.White,
-    unfocusedTextColor = Color.White,
-    focusedBorderColor = OrangePrimary,
-    unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
-)
+private fun ShimmerGalleryTile() {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = CardBackground,
+        modifier = Modifier.fillMaxWidth().height(140.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.White.copy(alpha = alpha)))
+    }
+}

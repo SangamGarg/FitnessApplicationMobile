@@ -33,17 +33,23 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.muscleplay.app.core.di.AppContainer
 import com.muscleplay.app.feature.auth.OtpVerificationScreen
 import com.muscleplay.app.feature.auth.ResetPasswordScreen
 import com.muscleplay.app.feature.auth.SignInScreen
 import com.muscleplay.app.feature.auth.SignUpScreen
+import com.muscleplay.app.feature.analytics.AllCalculatorsScreen
 import com.muscleplay.app.feature.analytics.AnalyticsScreen
+import com.muscleplay.app.feature.analytics.DynamicCalculatorInputScreen
 import com.muscleplay.app.feature.coins.MpCoinsHubScreen
 import com.muscleplay.app.feature.diet.DietHomeScreen
 import com.muscleplay.app.feature.diet.IngredientScannerScreen
+import com.muscleplay.app.feature.games.GameHistoryScreen
 import com.muscleplay.app.feature.games.GamesScreen
 import com.muscleplay.app.feature.games.RepChallengeScreen
+import com.muscleplay.app.feature.games.RewardHistoryScreen
 import com.muscleplay.app.feature.games.pushup.PushUpCameraScreen
 import com.muscleplay.app.feature.games.squat.SquatCameraScreen
 import com.muscleplay.app.feature.home.HomeScreen
@@ -97,7 +103,11 @@ object Routes {
     const val HOME = "home"
     const val WORKOUTS = "workouts"
     const val GAMES = "games"
+    const val REWARD_HISTORY = "reward_history"
+    const val GAME_HISTORY = "game_history"
     const val ANALYTICS = "analytics"
+    const val ALL_CALCULATORS = "all_calculators"
+    const val DYNAMIC_CALCULATOR = "dynamic_calculator/{calcKey}"
     const val PROFILE = "profile"
 }
 
@@ -155,7 +165,11 @@ fun MusclePlayNavigation(
         Routes.PROFILE_COIN_REDEMPTION,
         Routes.PROFILE_EMAIL_SUPPORT,
         Routes.PROFILE_AI_BOT,
-        Routes.NOTIFICATIONS
+        Routes.NOTIFICATIONS,
+        Routes.REWARD_HISTORY,
+        Routes.GAME_HISTORY,
+        Routes.ALL_CALCULATORS,
+        Routes.DYNAMIC_CALCULATOR
     )
     var isWorkoutSessionActive by remember { mutableStateOf(false) }
 
@@ -360,17 +374,18 @@ fun MusclePlayNavigation(
             }
             composable(Routes.GAMES) {
                 GamesScreen(
+                    gamesRepository = appContainer.gamesRepository,
                     onPlayGame = { gameId ->
                         when (gameId) {
-                            Routes.SQUAT_MASTER_ROUTE -> {
+                            Routes.SQUAT_MASTER_ROUTE, "squat_master" -> {
                                 navController.navigate(Routes.SQUAT_MASTER_ROUTE)
                             }
 
-                            Routes.REP_CHALLENGE_ROUTE -> {
+                            Routes.REP_CHALLENGE_ROUTE, "rep_challenge" -> {
                                 navController.navigate(Routes.REP_CHALLENGE_ROUTE)
                             }
 
-                            Routes.PUSH_UP_MASTER_ROUTE -> {
+                            Routes.PUSH_UP_MASTER_ROUTE, "push_up_master" -> {
                                 navController.navigate(Routes.PUSH_UP_MASTER_ROUTE)
                             }
 
@@ -378,15 +393,56 @@ fun MusclePlayNavigation(
 
                             }
                         }
-                    })
+                    },
+                    onNavigateToRewardHistory = { navController.navigate(Routes.REWARD_HISTORY) },
+                    onNavigateToGameHistory = { navController.navigate(Routes.GAME_HISTORY) }
+                )
+            }
+            composable(Routes.REWARD_HISTORY) {
+                RewardHistoryScreen(
+                    gamesRepository = appContainer.gamesRepository,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Routes.GAME_HISTORY) {
+                GameHistoryScreen(
+                    gamesRepository = appContainer.gamesRepository,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(Routes.ANALYTICS) {
-                AnalyticsScreen()
+                AnalyticsScreen(
+                    analyticsRepository = appContainer.analyticsRepository,
+                    onNavigateToAllCalculators = { navController.navigate(Routes.ALL_CALCULATORS) },
+                    onNavigateToCalculatorInput = { calcKey ->
+                        navController.navigate("dynamic_calculator/$calcKey")
+                    },
+                    onNavigateToDietHome = { navController.navigate(Routes.DIET_HOME) }
+                )
+            }
+            composable(Routes.ALL_CALCULATORS) {
+                AllCalculatorsScreen(
+                    analyticsRepository = appContainer.analyticsRepository,
+                    onBack = { navController.popBackStack() },
+                    onSelectCalculator = { calcKey ->
+                        navController.navigate("dynamic_calculator/$calcKey")
+                    }
+                )
+            }
+            composable(
+                route = Routes.DYNAMIC_CALCULATOR,
+                arguments = listOf(navArgument("calcKey") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val calcKey = backStackEntry.destination.route?.substringAfterLast("/")?.takeIf { it != "calcKey" && it.isNotBlank() } ?: "bmi"
+                DynamicCalculatorInputScreen(
+                    calculatorKey = calcKey,
+                    analyticsRepository = appContainer.analyticsRepository,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(Routes.PROFILE) {
                 ProfileScreen(
                     authRepository = appContainer.authRepository,
-                    dashboardRepository = appContainer.dashboardRepository,
                     userSessionRepository = appContainer.userSessionRepository,
                     profileRepository = appContainer.profileRepository,
                     onNavigateToSettings = { navController.navigate(Routes.PROFILE_SETTINGS) },
@@ -411,6 +467,7 @@ fun MusclePlayNavigation(
             }
             composable(Routes.PROFILE_GALLERY) {
                 FullPhotoGalleryScreen(
+                    profileRepository = appContainer.profileRepository,
                     onBack = {
                         navController.popBackStack()
                     })

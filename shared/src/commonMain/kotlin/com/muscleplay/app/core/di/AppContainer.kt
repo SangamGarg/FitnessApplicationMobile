@@ -65,5 +65,17 @@ class AppContainer {
             tokenStorageManager = tokenStorageManager
         )
 
+    val analyticsRepository: com.muscleplay.app.feature.analytics.data.AnalyticsRepository =
+        com.muscleplay.app.feature.analytics.data.AnalyticsRepositoryImpl(
+            apiClient = apiClient,
+            tokenStorageManager = tokenStorageManager
+        )
+
+    val gamesRepository: com.muscleplay.app.feature.games.data.GamesRepository =
+        com.muscleplay.app.feature.games.data.GamesRepositoryImpl(
+            apiClient = apiClient,
+            tokenStorageManager = tokenStorageManager
+        )
+
     val mealDao: MealDao = InMemoryMealDao()
 }

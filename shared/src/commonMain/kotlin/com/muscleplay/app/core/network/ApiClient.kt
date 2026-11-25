@@ -1,8 +1,10 @@
 package com.muscleplay.app.core.network
 
+import com.muscleplay.app.core.network.api.AnalyticsApiService
 import com.muscleplay.app.core.network.api.AuthApiService
 import com.muscleplay.app.core.network.api.DashboardApiService
 import com.muscleplay.app.core.network.api.EmailSupportApiService
+import com.muscleplay.app.core.network.api.GamesApiService
 import com.muscleplay.app.core.network.api.NotificationApiService
 import com.muscleplay.app.core.network.api.ProfileApiService
 import com.muscleplay.app.core.network.api.SupportApiService
@@ -10,8 +12,10 @@ import com.muscleplay.app.core.network.api.TicketApiService
 import com.muscleplay.app.core.network.api.WorkoutApiService
 import com.muscleplay.app.core.network.auth.TokenStorageManager
 import com.muscleplay.app.core.network.client.HttpClientFactory
+import com.muscleplay.app.core.network.dto.AnalyticsHomeResponseDto
 import com.muscleplay.app.core.network.dto.AppInfoContentResponseDto
 import com.muscleplay.app.core.network.dto.AuthResponseDto
+import com.muscleplay.app.core.network.dto.CalculatorHomeResponseDto
 import com.muscleplay.app.core.network.dto.CreateSupportTicketRequestDTO
 import com.muscleplay.app.core.network.dto.DashboardResponseDto
 import com.muscleplay.app.core.network.dto.DeviceRegisterRequestDto
@@ -20,15 +24,26 @@ import com.muscleplay.app.core.network.dto.EmailFromUserResponseDto
 import com.muscleplay.app.core.network.dto.FeedbackRequestDto
 import com.muscleplay.app.core.network.dto.FeedbackResponseDto
 import com.muscleplay.app.core.network.dto.FollowUsLinkDto
+import com.muscleplay.app.core.network.dto.GameCompleteRequestDto
+import com.muscleplay.app.core.network.dto.GameDetailResponseDto
+import com.muscleplay.app.core.network.dto.GameHistoryPageResponse
+import com.muscleplay.app.core.network.dto.GameSessionResponseDto
+import com.muscleplay.app.core.network.dto.GameStartRequestDto
+import com.muscleplay.app.core.network.dto.GamificationHomeSummaryResponseDto
+import com.muscleplay.app.core.network.dto.RewardHistoryPageResponse
 import com.muscleplay.app.core.network.dto.NotificationHistoryResponseDto
 import com.muscleplay.app.core.network.dto.NotificationPreferenceRequestDto
 import com.muscleplay.app.core.network.dto.OtpActionResponseDto
 import com.muscleplay.app.core.network.dto.OtpRequestDto
+import com.muscleplay.app.core.network.dto.ProfileHomeResponse
+import com.muscleplay.app.core.network.dto.ProgressGalleryPageResponse
+import com.muscleplay.app.core.network.dto.ProgressGalleryResponseDto
 import com.muscleplay.app.core.network.dto.RefreshTokenRequestDto
 import com.muscleplay.app.core.network.dto.RefreshTokenResponseDto
 import com.muscleplay.app.core.network.dto.ResetPasswordWithOtpRequestDto
 import com.muscleplay.app.core.network.dto.SignInRequestDto
 import com.muscleplay.app.core.network.dto.SignUpRequestDto
+import com.muscleplay.app.core.network.dto.SmartCalculationRequest
 import com.muscleplay.app.core.network.dto.SupportAttachment
 import com.muscleplay.app.core.network.dto.SupportEmailHomeResponseDto
 import com.muscleplay.app.core.network.dto.SupportFaqPageDto
@@ -63,6 +78,7 @@ import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -77,7 +93,7 @@ class ApiClient(
     val baseUrl: String = getPlatformBaseUrl(),
     private val ktorClient: HttpClient = HttpClientFactory.create(),
     var tokenStorageManager: TokenStorageManager? = null,
-) : AuthApiService, WorkoutApiService, NotificationApiService, DashboardApiService, ProfileApiService, SupportApiService, EmailSupportApiService, TicketApiService {
+) : AuthApiService, WorkoutApiService, NotificationApiService, DashboardApiService, ProfileApiService, SupportApiService, EmailSupportApiService, TicketApiService, AnalyticsApiService, GamesApiService {
 
     override suspend fun sendSignupOtp(email: String): NetworkResult<OtpActionResponseDto> {
         return executeKtorRequest(
@@ -387,6 +403,98 @@ class ApiClient(
         )
     }
 
+    override suspend fun fetchProfileHome(accessToken: String): NetworkResult<ProfileHomeResponse> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/profile/home",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun fetchProgressGallery(
+        accessToken: String,
+        page: Int,
+        size: Int,
+    ): NetworkResult<ProgressGalleryPageResponse> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/profile/gallery?page=$page&size=$size",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun fetchGalleryImageDetails(
+        accessToken: String,
+        imageId: Long,
+    ): NetworkResult<ProgressGalleryResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/profile/gallery/$imageId",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun uploadProgressGalleryImage(
+        accessToken: String,
+        attachment: SupportAttachment,
+        caption: String?,
+    ): NetworkResult<ProgressGalleryResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+
+        return try {
+            val response = ktorClient.post("$baseUrl/profile/gallery") {
+                authHeader.forEach { (key, value) -> header(key, value) }
+                setBody(
+                    MultiPartFormDataContent(
+                        formData {
+                            if (attachment.bytes != null) {
+                                append("file", attachment.bytes, Headers.build {
+                                    append(HttpHeaders.ContentDisposition, "filename=\"${attachment.name}\"")
+                                    append(HttpHeaders.ContentType, attachment.mimeType)
+                                })
+                            }
+                            if (!caption.isNullOrBlank()) {
+                                append("caption", caption)
+                            }
+                        }
+                    )
+                )
+            }
+
+            if (response.status.isSuccess()) {
+                val parsed: ProgressGalleryResponseDto = response.body()
+                NetworkResult.Success(parsed)
+            } else {
+                val errorBody = response.bodyAsText()
+                val errorMsg = parseErrorMessage(errorBody, "Server error (${response.status.value})")
+                NetworkResult.Error(response.status.value, errorMsg)
+            }
+        } catch (e: Throwable) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            NetworkResult.Exception(e)
+        }
+    }
+
+    override suspend fun deleteProgressGalleryImage(
+        accessToken: String,
+        imageId: Long,
+    ): NetworkResult<Boolean> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/profile/gallery/$imageId",
+            httpMethod = HttpMethod.Delete,
+            headers = authHeader
+        )
+    }
+
     override suspend fun fetchSupportHome(accessToken: String): NetworkResult<SupportHomeResponseDto> {
         val authHeader =
             if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
@@ -587,6 +695,118 @@ class ApiClient(
             if (e is kotlinx.coroutines.CancellationException) throw e
             NetworkResult.Exception(e)
         }
+    }
+
+    override suspend fun fetchAnalyticsHome(accessToken: String): NetworkResult<AnalyticsHomeResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/analytics/home",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun fetchCalculatorHome(accessToken: String): NetworkResult<CalculatorHomeResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/analytics/calculator/home",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun calculateSmart(
+        accessToken: String,
+        calculatorKey: String,
+        request: SmartCalculationRequest,
+    ): NetworkResult<Map<String, JsonElement>> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/analytics/$calculatorKey",
+            httpMethod = HttpMethod.Post,
+            headers = authHeader,
+            bodyObj = request
+        )
+    }
+
+    override suspend fun fetchGamificationHome(accessToken: String): NetworkResult<GamificationHomeSummaryResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/gamification/home/summary",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun fetchGameDetails(accessToken: String, gameType: String): NetworkResult<GameDetailResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/gamification/$gameType/details",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun startGameSession(
+        accessToken: String,
+        request: GameStartRequestDto,
+    ): NetworkResult<GameSessionResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/gamification/sessions/start",
+            httpMethod = HttpMethod.Post,
+            headers = authHeader,
+            bodyObj = request
+        )
+    }
+
+    override suspend fun completeGameSession(
+        accessToken: String,
+        sessionId: String,
+        request: GameCompleteRequestDto,
+    ): NetworkResult<GameSessionResponseDto> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/gamification/sessions/$sessionId/complete",
+            httpMethod = HttpMethod.Post,
+            headers = authHeader,
+            bodyObj = request
+        )
+    }
+
+    override suspend fun fetchRewardHistory(
+        accessToken: String,
+        page: Int,
+        size: Int,
+    ): NetworkResult<RewardHistoryPageResponse> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/gamification/rewards/history?page=$page&size=$size",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
+    }
+
+    override suspend fun fetchGameHistory(
+        accessToken: String,
+        page: Int,
+        size: Int,
+    ): NetworkResult<GameHistoryPageResponse> {
+        val authHeader =
+            if (accessToken.isNotBlank()) mapOf("Authorization" to "Bearer $accessToken") else emptyMap()
+        return executeKtorRequest(
+            url = "$baseUrl/gamification/history?page=$page&size=$size",
+            httpMethod = HttpMethod.Get,
+            headers = authHeader
+        )
     }
 
     private suspend inline fun <reified T> executeKtorRequest(

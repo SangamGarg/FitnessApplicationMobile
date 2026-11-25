@@ -59,7 +59,7 @@ internal object AuthValidator {
         "^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}$"
     )
 
-    private val REFERRAL_CODE_REGEX = Regex("^[A-Z]{2}-MP-[A-Z0-9]{4}$")
+    private val REFERRAL_CODE_REGEX = Regex("^[A-Z]{2}MP[A-Z0-9]{6}$")
 
     fun referralCodeError(raw: String): String? {
         val code = raw.trim().uppercase()
@@ -68,7 +68,7 @@ internal object AuthValidator {
             return "Referral Code cannot exceed $MAX_REFERRAL_CODE_LENGTH characters"
         }
         if (!REFERRAL_CODE_REGEX.matches(code)) {
-            return "Invalid Referral Code format. Example: IN-MP-A8K2"
+            return "Invalid Referral Code format. Example: SAMPA8K264"
         }
         return null
     }

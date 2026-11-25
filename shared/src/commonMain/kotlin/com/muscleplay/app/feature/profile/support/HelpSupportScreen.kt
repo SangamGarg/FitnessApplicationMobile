@@ -221,7 +221,7 @@ fun HelpSupportScreen(
                                     icon = Icons.Default.SmartToy,
                                     badgeText = "24/7 Instant",
                                     badgeColor = Color(0xFF4CAF50),
-                                    title = "AI Support Coach",
+                                    title = "ChatBot Support",
                                     subtitle = "Instant automated answers",
                                     onClick = onNavigateToAiBot
                                 )
@@ -229,10 +229,10 @@ fun HelpSupportScreen(
                             item {
                                 GlassInstantHelpCard(
                                     icon = Icons.Default.Mail,
-                                    badgeText = "Replies ~2h",
+                                    badgeText = "Replies ~12h",
                                     badgeColor = OrangeSecondary,
                                     title = "Email Support",
-                                    subtitle = "File detailed tickets & logs",
+                                    subtitle = "File detailed Issue",
                                     onClick = onNavigateToEmailSupport
                                 )
                             }
@@ -242,7 +242,7 @@ fun HelpSupportScreen(
                                     badgeText = "My Issues",
                                     badgeColor = Color(0xFF2196F3),
                                     title = "Ticket History",
-                                    subtitle = "View raised support tickets",
+                                    subtitle = "View raised tickets",
                                     onClick = onNavigateToMyTickets
                                 )
                             }
